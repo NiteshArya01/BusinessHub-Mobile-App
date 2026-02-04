@@ -1,21 +1,26 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 
-export default function LoginScreen({ navigation }) {
+export default function LoginScreen({ navigation, route }) {
+  const { onLogin } = route.params || {}; // App.js se aane wala function
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   // Sign In function
 const handleSignIn = async () => {
   try {
-    // TODO: Firebase/Auth logic
-    console.log('Login:', { email, password });
+      console.log('Login success');
 
-    // ✅ Navigate to Drawer-based AppNavigator
-    navigation.replace('Dashboard');
-  } catch (error) {
-    console.error('Login error:', error);
-  }
+      // ✅ navigation.replace ki jagah ye call karein
+      if (onLogin) {
+        onLogin(); 
+      } else {
+        // Agar params se nahi mila (backup logic)
+        navigation.navigate('Dashboard'); 
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+    }
 };
 
   return (

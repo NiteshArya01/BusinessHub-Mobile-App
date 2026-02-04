@@ -1,18 +1,10 @@
 import React, { useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
 import RootNavigator from './app/navigation/RootNavigator';
 
 export default function App() {
-  // Shuruat mein false rakhein taaki login screen dikhe
-  const [isLoggedIn, setIsLoggedIn] = useState();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // Yeh function hum Login screen ko pass karenge
-  const handleLogin = () => {
-    setIsLoggedIn(true);
-  };
+  const handleLogin = () => setIsLoggedIn(true); // Yeh function redirect karega
 
-  return (
-    // RootNavigator ko login status aur function bhejein
-    <RootNavigator isLoggedIn={isLoggedIn} onLogin={handleLogin} />
-  );
+  return <RootNavigator isLoggedIn={isLoggedIn} onLogin={handleLogin} />;
 }

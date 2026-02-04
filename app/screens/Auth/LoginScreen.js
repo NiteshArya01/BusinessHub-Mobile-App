@@ -9,18 +9,16 @@ export default function LoginScreen({ navigation, route }) {
   // Sign In function
 const handleSignIn = async () => {
   try {
-      console.log('Login success');
+    // Aapka login logic (Firebase/API) yahan aayega
+    console.log('Login success');
 
-      // ✅ navigation.replace ki jagah ye call karein
-      if (onLogin) {
-        onLogin(); 
-      } else {
-        // Agar params se nahi mila (backup logic)
-        navigation.navigate('Dashboard'); 
-      }
-    } catch (error) {
-      console.error('Login error:', error);
+    // ✅ Manual navigation ki jagah state change karein
+    if (route.params?.onLogin) {
+      route.params.onLogin(); 
     }
+  } catch (error) {
+    console.error('Login error:', error);
+  }
 };
 
   return (

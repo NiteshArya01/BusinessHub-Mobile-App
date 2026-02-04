@@ -1,26 +1,79 @@
-import React, { useEffect } from 'react';
-import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 
-const Loader = ({ navigation }) => {
+export default function Leader({ navigation }) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      navigation.replace('Login');
-    }, 3000); // 3 seconds loader
-
-    return () => clearTimeout(timer);
+    // Sequence animation
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 1500,
+        easing: Easing.out(Easing.exp),
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Navigate to Home after animation
+      setTimeout(() => {
+        navigation.replace('Login');
+      }, 1000);
+    });
   }, []);
 
   return (
     <View style={styles.container}>
-      <ActivityIndicator size="large" color="#1E90FF" />
-      <Text style={styles.text}>BusinessHub Loading...</Text>
+
+      <Animated.View
+        style={[
+          styles.iconContainer,
+          { transform: [{ scale: scaleAnim }] },
+        ]}
+      >
+        <Text style={styles.icon}>📘∞</Text>
+      </Animated.View>
+
+    
+      <Animated.Text style={[styles.title, { opacity: fadeAnim }]}>
+        Tera Book
+      </Animated.Text>
+
+    
+      <Animated.Text style={[styles.tagline, { opacity: fadeAnim }]}>
+        Accounting for the Infinite Era
+      </Animated.Text>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' },
-  text: { marginTop: 20, color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  container: {
+    flex: 1,
+    backgroundColor: '#000', // Dark mode background
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconContainer: {
+    marginBottom: 20,
+  },
+  icon: {
+    fontSize: 64,
+    color: '#007BFF', // Vibrant blue
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  tagline: {
+    fontSize: 16,
+    color: '#ccc',
+    marginTop: 8,
+  },
 });
-
-export default Loader;

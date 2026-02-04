@@ -33,7 +33,7 @@ function CustomDrawerContent(props) {
             <Text style={styles.profileLetter}>B</Text>
           </View>
           <View style={styles.headerTextContainer}>
-            <Text style={styles.businessName}>BusinessHub</Text>
+            <Text style={styles.businessName}>TeraBook</Text>
             <Text style={styles.userRole}>Admin Account</Text>
           </View>
         </View>
@@ -43,8 +43,8 @@ function CustomDrawerContent(props) {
 
         {/* Purchase Plan Card (Aapki screenshot jaisa) */}
         <View style={styles.planCard}>
-          <Text style={styles.planTitle}>#1 BusinessHub</Text>
-          <Text style={styles.planSubtitle}>Smart way to manage your finances.</Text>
+          <Text style={styles.planTitle}>TeraBook</Text>
+          <Text style={styles.planSubtitle}>Accounting for the infinite Era.</Text>
           <TouchableOpacity style={styles.planButton}>
             <Text style={styles.planButtonText}>Purchase Plan</Text>
           </TouchableOpacity>

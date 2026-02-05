@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing,Image } from 'react-native';
 
 export default function Leader({ navigation }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -36,7 +36,12 @@ export default function Leader({ navigation }) {
           { transform: [{ scale: scaleAnim }] },
         ]}
       >
-        <Text style={styles.icon}>📘∞</Text>
+        <Image 
+          source={require('../../assets/terabook-icon.png')} // पाथ चेक करें (src/screens/Auth के हिसाब से ../../assets)
+          style={styles.icon}
+          resizeMode="contain"
+        />
+        {/* <Text style={styles.icon}>📘∞</Text> */}
       </Animated.View>
 
     
@@ -63,7 +68,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   icon: {
-    fontSize: 64,
+    width: 108,
+    height: 108,
     color: '#007BFF', // Vibrant blue
   },
   title: {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ActivityIndicator, Keyboard } from 'react-native';
+import { Ionicons } from '@expo/vector-icons'; // Eye icon ke liye
 import { AuthController } from '../../controllers/AuthController';
 
 export default function LoginScreen({ navigation, route }) {
@@ -9,13 +10,14 @@ export default function LoginScreen({ navigation, route }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false); // Eye toggle state
   
   // Validation States
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [generalError, setGeneralError] = useState('');
 
-  // Validation Logic
+  // Validation Logic (Same as before)
   const validate = () => {
     let isValid = true;
     setEmailError('');
@@ -42,7 +44,7 @@ export default function LoginScreen({ navigation, route }) {
   };
 
   const handleSignIn = async () => {
-    Keyboard.dismiss(); // Keyboard band kar dega
+    Keyboard.dismiss(); 
     
     if (!validate()) return;
 
@@ -53,7 +55,6 @@ export default function LoginScreen({ navigation, route }) {
     if (result.success) {
       if (onLogin) onLogin();
     } else {
-      // Alert ki jagah screen par error dikhayenge
       setGeneralError(result.message || "Invalid email or password");
     }
   };
@@ -67,7 +68,6 @@ export default function LoginScreen({ navigation, route }) {
       <Text style={styles.title}>Welcome to Tera Book</Text>
       <Text style={styles.subtitle}>Sign in to manage your business</Text>
 
-      {/* General Error Message */}
       {generalError ? <Text style={styles.errorTextCenter}>{generalError}</Text> : null}
 
       {/* Email Input */}
@@ -83,15 +83,27 @@ export default function LoginScreen({ navigation, route }) {
         {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
       </View>
 
-      {/* Password Input */}
+      {/* Password Input with Eye Icon */}
       <View style={styles.inputWrapper}>
-        <TextInput
-          style={[styles.input, passwordError ? styles.inputError : null]}
-          placeholder="Password"
-          value={password}
-          onChangeText={(text) => { setPassword(text); setPasswordError(''); }}
-          secureTextEntry
-        />
+        <View style={[styles.passwordWrapper, passwordError ? styles.inputError : null]}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Password"
+            value={password}
+            onChangeText={(text) => { setPassword(text); setPasswordError(''); }}
+            secureTextEntry={!showPassword}
+          />
+          <TouchableOpacity 
+            style={styles.eyeIcon} 
+            onPress={() => setShowPassword(!showPassword)}
+          >
+            <Ionicons 
+              name={showPassword ? "eye-off" : "eye"} 
+              size={20} 
+              color="#666" 
+            />
+          </TouchableOpacity>
+        </View>
         {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
       </View>
 
@@ -130,8 +142,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     fontSize: 16
   },
+
+  // ✅ Password Specific Styles (Bina existing design kharab kiye)
+  passwordWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    backgroundColor: '#fff',
+  },
+  passwordInput: { 
+    flex: 1, 
+    padding: 14, 
+    fontSize: 16 
+  },
+  eyeIcon: { 
+    paddingHorizontal: 12 
+  },
+
   inputError: { borderColor: '#ff4d4d', backgroundColor: '#fff9f9' },
-  
   errorText: { color: '#ff4d4d', fontSize: 12, marginTop: 4, marginLeft: 5 },
   errorTextCenter: { 
     color: '#ff4d4d', 

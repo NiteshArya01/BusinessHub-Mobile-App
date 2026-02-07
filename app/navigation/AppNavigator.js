@@ -1,9 +1,9 @@
 import React from 'react';
-import { StyleSheet, View, Text,TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text,TouchableOpacity,Image } from 'react-native';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
 import { createStackNavigator } from '@react-navigation/stack'; // Stack Navigator import karein
 import { Ionicons } from '@expo/vector-icons'; // Icons ke liye
-
+import UserMenu from '../components/UserMenu';
 
 // Screens
 import DashboardScreen from '../screens/Dashboard/DashboardScreen';
@@ -22,13 +22,15 @@ const Stack = createStackNavigator();
 
 
 // AppNavigator.js ke andar SupplierStack ko aise update karein
-function SupplierStack({ navigation }) {
+function SupplierStack({ navigation,route }) {
+  const { onLogout } = route.params || {};
   return (
     <Stack.Navigator 
       screenOptions={{ 
         headerShown: true, // Hum Stack ka header use karenge
         headerStyle: { backgroundColor: '#0077cc' },
         headerTintColor: '#fff',
+        headerRight: () => <UserMenu onLogout={onLogout} />,
       }}
     >
       <Stack.Screen 
@@ -70,11 +72,12 @@ function CustomDrawerContent(props) {
         {/* Header Section (Jo humne pehle banaya tha) */}
         <View style={styles.drawerHeader}>
           <View style={styles.profileCircle}>
-            <Text style={styles.profileLetter}>B</Text>
+            {/* <Text style={styles.profileLetter}>B</Text> */}
+            <Image source={require('../../assets/company-logo.png')} style={{ width: 60, height: 60, borderRadius: 30 }} />
           </View>
           <View style={styles.headerTextContainer}>
-            <Text style={styles.businessName}>TeraBook</Text>
-            <Text style={styles.userRole}>Admin Account</Text>
+            <Text style={styles.businessName}>Tera Book</Text>
+            <Text style={styles.userRole}>Accounting for the infinite Era</Text>
           </View>
         </View>
 
@@ -84,7 +87,7 @@ function CustomDrawerContent(props) {
         {/* Purchase Plan Card (Aapki screenshot jaisa) */}
         <View style={styles.planCard}>
           <Text style={styles.planTitle}>TeraBook</Text>
-          <Text style={styles.planSubtitle}>Accounting for the infinite Era.</Text>
+          <Text style={styles.planSubtitle}>Don't just manage, lead your business with TeraBook Premium.</Text>
           <TouchableOpacity style={styles.planButton}>
             <Text style={styles.planButtonText}>Purchase Plan</Text>
           </TouchableOpacity>
@@ -92,12 +95,12 @@ function CustomDrawerContent(props) {
       </DrawerContentScrollView>
 
       {/* Logout Button Section at Bottom */}
-      <View style={styles.logoutSection}>
+      {/* <View style={styles.logoutSection}>
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={22} color="#e91e63" />
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
-      </View>
+      </View> */}
     </View>
   );
 }
@@ -108,17 +111,32 @@ export default function AppNavigator({ onLogout }) {
       initialRouteName="Dashboard"
       drawerContent={(props) => <CustomDrawerContent {...props} onLogout={onLogout} />}
       // drawerContent={(props) => <CustomDrawerContent {...props} />}
+      // screenOptions={{
+      //   headerStyle: {
+      //     backgroundColor: '#0077cc', 
+      //     elevation: 5,
+      //     shadowOpacity: 0.3,
+      //   },
+      //   headerTintColor: '#fff',
+      //   headerTitleStyle: { fontWeight: 'bold', fontSize: 18 },
+      //   drawerActiveTintColor: '#0077cc',
+      //   drawerInactiveTintColor: '#333',
+      //   drawerLabelStyle: { fontSize: 15, fontWeight: '500', marginLeft: -10 }, // Icon ke saath alignment
+      // }}
       screenOptions={{
         headerStyle: {
           backgroundColor: '#0077cc', 
           elevation: 5,
-          shadowOpacity: 0.3,
         },
         headerTintColor: '#fff',
         headerTitleStyle: { fontWeight: 'bold', fontSize: 18 },
+        
+        // ✅ YAHAN USER MENU ADD KIYA
+        headerRight: () => <UserMenu onLogout={onLogout} />, 
+
         drawerActiveTintColor: '#0077cc',
         drawerInactiveTintColor: '#333',
-        drawerLabelStyle: { fontSize: 15, fontWeight: '500', marginLeft: -10 }, // Icon ke saath alignment
+        drawerLabelStyle: { fontSize: 15, fontWeight: '500', marginLeft: -10 },
       }}
     >
       <Drawer.Screen 
@@ -145,17 +163,17 @@ export default function AppNavigator({ onLogout }) {
       <Drawer.Screen 
         name="Supplier Ledger" 
         component={SupplierStack}
-       options={{ 
-    headerShown: false, // ❌ Drawer ka header band kar diya
-    drawerIcon: ({ color, size }) => <Ionicons name="people-outline" size={size} color={color} /> 
+        initialParams={{ onLogout: onLogout }}
+        options={{ 
+        headerShown: false, // ❌ Drawer ka header band kar diya
+        drawerIcon: ({ color, size }) => <Ionicons name="people-outline" size={size} color={color} /> 
   }}
       />
       <Drawer.Screen 
         name="Wholesale Ledger" 
         component={WholesaleLedgerScreen} 
-       options={{ 
-          headerShown: false, // ✅ Drawer ka "ganda" header band kar diya
-          drawerIcon: ({ color, size }) => <Ionicons name="people-outline" size={size} color={color} /> 
+        options={{
+          drawerIcon: ({ color, size }) => <Ionicons name="cube-outline" size={size} color={color} />
         }}
       />
       <Drawer.Screen 

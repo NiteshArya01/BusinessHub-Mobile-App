@@ -1,59 +1,134 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet,Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Keyboard, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { UserController } from '../../controllers/UserController'; // Path check karein
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 export default function SignupScreen({ navigation }) {
+  // Input States
   const [businessName, setBusinessName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  
+  // UI States
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSignup = () => {
-    // TODO: connect with Firebase or backend
-    console.log('Signup:', { businessName, email, password });
-    navigation.navigate('Login');
+  // Validation States (Red Error logic ke liye)
+  const [nameError, setNameError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+
+  // Red Validation Logic
+  const validate = () => {
+    let isValid = true;
+    setNameError('');
+    setEmailError('');
+    setPasswordError('');
+
+    if (!businessName.trim()) {
+      setNameError('Business name is required');
+      isValid = false;
+    } else if (businessName.length < 3) {
+      setNameError('Name must be at least 3 characters');
+      isValid = false;
+    }
+
+    if (!email) {
+      setEmailError('Email is required');
+      isValid = false;
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      setEmailError('Please enter a valid email');
+      isValid = false;
+    }
+
+    if (!password) {
+      setPasswordError('Password is required');
+      isValid = false;
+    } else if (password.length < 6) {
+      setPasswordError('Password must be at least 6 characters');
+      isValid = false;
+    }
+
+    return isValid;
+  };
+
+  const onSignupPress = async () => {
+    Keyboard.dismiss();
+    if (!validate()) return;
+
+    setLoading(true);
+    const result = await UserController.registerUser(email, password, businessName);
+    setLoading(false);
+
+    if (result.success) {
+      navigation.navigate('Login');
+    } else {
+      // Agar Firebase se koi error aata hai (jaise Email already exists)
+      if (result.error.includes('email')) {
+        setEmailError(result.error);
+      } else {
+        setPasswordError(result.error);
+      }
+    }
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.logoContainer}>
-              <Image 
-                source={require('../../../assets/terabook-icon.png')} // पाथ चेक करें (src/screens/Auth के हिसाब से ../../assets)
-                style={styles.logo}
-                resizeMode="contain"
-              />
+        <Image source={require('../../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
       </View>
+
       <Text style={styles.title}>Create Account</Text>
-      <Text style={styles.subtitle}>Join BusinessHub to manage your business efficiently</Text>
+      <Text style={styles.subtitle}>Join TeraBook to manage your business efficiently</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Business Name"
-        value={businessName}
-        onChangeText={setBusinessName}
-      />
+      {/* Business Name Input */}
+      <View style={styles.inputWrapper}>
+        <TextInput
+          style={[styles.input, nameError ? styles.inputError : null]}
+          placeholder="Business Name"
+          value={businessName}
+          onChangeText={(text) => { setBusinessName(text); setNameError(''); }}
+        />
+        {nameError ? <Text style={styles.errorText}>{nameError}</Text> : null}
+      </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email Address"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
+      {/* Email Input */}
+      <View style={styles.inputWrapper}>
+        <TextInput
+          style={[styles.input, emailError ? styles.inputError : null]}
+          placeholder="Email Address"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          value={email}
+          onChangeText={(text) => { setEmail(text); setEmailError(''); }}
+        />
+        {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+      </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
+      {/* Password Input with Eye Icon */}
+      <View style={styles.inputWrapper}>
+        <View style={[styles.passwordWrapper, passwordError ? styles.inputError : null]}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Password"
+            secureTextEntry={!showPassword}
+            value={password}
+            onChangeText={(text) => { setPassword(text); setPasswordError(''); }}
+          />
+          <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowPassword(!showPassword)}>
+            <Ionicons name={showPassword ? "eye-off" : "eye"} size={20} color="#666" />
+          </TouchableOpacity>
+        </View>
+        {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+      </View>
 
-      <TouchableOpacity style={styles.button} onPress={handleSignup}>
-        <Text style={styles.buttonText}>Sign Up</Text>
+      <TouchableOpacity style={styles.button} onPress={onSignupPress} disabled={loading}>
+        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign Up</Text>}
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-        <Text style={styles.link}>Already have an account? Login</Text>
+        <Text style={styles.link}>Already have an account? <Text style={{fontWeight: 'bold'}}>Login</Text></Text>
       </TouchableOpacity>
     </View>
   );
@@ -61,18 +136,38 @@ export default function SignupScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, backgroundColor: '#f9f9f9' },
-  logoContainer: {
+  logoContainer: { alignItems: 'center', marginBottom: 10 },
+  logo: { width: 100, height: 100 },
+  title: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', color: '#0077cc' },
+  subtitle: { fontSize: 14, textAlign: 'center', marginBottom: 20, color: '#666' },
+  
+  inputWrapper: { marginBottom: 15 },
+  input: { 
+    borderWidth: 1, 
+    borderColor: '#ddd', 
+    borderRadius: 10, 
+    padding: 14, 
+    backgroundColor: '#fff',
+    fontSize: 16
+  },
+  
+  // Password Specific Wrapper
+  passwordWrapper: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    backgroundColor: '#fff',
   },
-  logo: {
-    width: 120, // आप अपनी पसंद के हिसाब से एडजस्ट कर सकते हैं
-    height: 120,
-  },
-  title: { fontSize: 26, fontWeight: 'bold', textAlign: 'center', marginBottom: 8, color: '#0077cc' },
-  subtitle: { fontSize: 14, textAlign: 'center', marginBottom: 24, color: '#555' },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, marginBottom: 16, backgroundColor: '#fff' },
-  button: { backgroundColor: '#0077cc', padding: 14, borderRadius: 8, marginBottom: 12 },
-  buttonText: { color: '#fff', fontWeight: '600', textAlign: 'center' },
-  link: { color: '#0077cc', textAlign: 'center', marginTop: 8 },
+  passwordInput: { flex: 1, padding: 14, fontSize: 16 },
+  eyeIcon: { paddingHorizontal: 12 },
+
+  // Error Styles
+  inputError: { borderColor: '#ff4d4d', backgroundColor: '#fff9f9' },
+  errorText: { color: '#ff4d4d', fontSize: 12, marginTop: 4, marginLeft: 5 },
+  
+  button: { backgroundColor: '#0077cc', padding: 16, borderRadius: 10, marginTop: 10, elevation: 2 },
+  buttonText: { color: '#fff', fontWeight: 'bold', textAlign: 'center', fontSize: 16 },
+  link: { color: '#0077cc', textAlign: 'center', marginTop: 20 },
 });

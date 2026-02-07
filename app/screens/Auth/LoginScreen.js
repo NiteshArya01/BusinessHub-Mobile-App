@@ -1,63 +1,114 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image } from 'react-native'; // Image यहाँ से इम्पोर्ट करें
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ActivityIndicator, Keyboard } from 'react-native';
+import { AuthController } from '../../controllers/AuthController';
 
 export default function LoginScreen({ navigation, route }) {
   const { onLogin } = route.params || {};
+  
+  // States
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  
+  // Validation States
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [generalError, setGeneralError] = useState('');
+
+  // Validation Logic
+  const validate = () => {
+    let isValid = true;
+    setEmailError('');
+    setPasswordError('');
+    setGeneralError('');
+
+    if (!email) {
+      setEmailError('Email is required');
+      isValid = false;
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      setEmailError('Please enter a valid email');
+      isValid = false;
+    }
+
+    if (!password) {
+      setPasswordError('Password is required');
+      isValid = false;
+    } else if (password.length < 6) {
+      setPasswordError('Password must be at least 6 characters');
+      isValid = false;
+    }
+
+    return isValid;
+  };
 
   const handleSignIn = async () => {
-    try {
-      console.log('Login success');
-      if (route.params?.onLogin) {
-        route.params.onLogin(); 
-      }
-    } catch (error) {
-      console.error('Login error:', error);
+    Keyboard.dismiss(); // Keyboard band kar dega
+    
+    if (!validate()) return;
+
+    setLoading(true);
+    const result = await AuthController.login(email, password);
+    setLoading(false);
+
+    if (result.success) {
+      if (onLogin) onLogin();
+    } else {
+      // Alert ki jagah screen par error dikhayenge
+      setGeneralError(result.message || "Invalid email or password");
     }
   };
 
   return (
     <View style={styles.container}>
-      {/* ✅ वेलकम टेक्स्ट के ऊपर इमेज */}
       <View style={styles.logoContainer}>
-        <Image 
-          source={require('../../../assets/terabook-icon.png')} // पाथ चेक करें (src/screens/Auth के हिसाब से ../../assets)
-          style={styles.logo}
-          resizeMode="contain"
-        />
+        <Image source={require('../../../assets/terabook-icon.png')} style={styles.logo} resizeMode="contain" />
       </View>
 
       <Text style={styles.title}>Welcome to Tera Book</Text>
-      <Text style={styles.subtitle}>Your Smart Billing & Inventory Companion</Text>
+      <Text style={styles.subtitle}>Sign in to manage your business</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email Address"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
+      {/* General Error Message */}
+      {generalError ? <Text style={styles.errorTextCenter}>{generalError}</Text> : null}
 
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
+      {/* Email Input */}
+      <View style={styles.inputWrapper}>
+        <TextInput
+          style={[styles.input, emailError ? styles.inputError : null]}
+          placeholder="Email Address"
+          value={email}
+          onChangeText={(text) => { setEmail(text); setEmailError(''); }}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+        {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+      </View>
 
-      <TouchableOpacity style={styles.button} onPress={handleSignIn}>
-        <Text style={styles.buttonText}>Sign In</Text>
+      {/* Password Input */}
+      <View style={styles.inputWrapper}>
+        <TextInput
+          style={[styles.input, passwordError ? styles.inputError : null]}
+          placeholder="Password"
+          value={password}
+          onChangeText={(text) => { setPassword(text); setPasswordError(''); }}
+          secureTextEntry
+        />
+        {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+      </View>
+
+      <TouchableOpacity 
+        style={[styles.button, loading && { opacity: 0.7 }]} 
+        onPress={handleSignIn} 
+        disabled={loading}
+      >
+        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign In</Text>}
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
         <Text style={styles.link}>Forgot password?</Text>
       </TouchableOpacity>
-
+      
       <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
-        <Text style={styles.link}>Don’t have an account? Sign Up</Text>
+        <Text style={styles.link}>Don't have an account? <Text style={{fontWeight: 'bold'}}>Sign Up</Text></Text>
       </TouchableOpacity>
     </View>
   );
@@ -65,19 +116,35 @@ export default function LoginScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, backgroundColor: '#f9f9f9' },
-  // ✅ लोगो के लिए स्टाइल
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
+  logoContainer: { alignItems: 'center', marginBottom: 10 },
+  logo: { width: 100, height: 100 },
+  title: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', color: '#0077cc' },
+  subtitle: { fontSize: 14, textAlign: 'center', marginBottom: 20, color: '#666' },
+  
+  inputWrapper: { marginBottom: 15 },
+  input: { 
+    borderWidth: 1, 
+    borderColor: '#ddd', 
+    borderRadius: 10, 
+    padding: 14, 
+    backgroundColor: '#fff',
+    fontSize: 16
   },
-  logo: {
-    width: 120, // आप अपनी पसंद के हिसाब से एडजस्ट कर सकते हैं
-    height: 120,
+  inputError: { borderColor: '#ff4d4d', backgroundColor: '#fff9f9' },
+  
+  errorText: { color: '#ff4d4d', fontSize: 12, marginTop: 4, marginLeft: 5 },
+  errorTextCenter: { 
+    color: '#ff4d4d', 
+    backgroundColor: '#ffe6e6', 
+    padding: 10, 
+    borderRadius: 8, 
+    textAlign: 'center', 
+    marginBottom: 15,
+    fontSize: 14,
+    fontWeight: '500'
   },
-  title: { fontSize: 26, fontWeight: 'bold', textAlign: 'center', marginBottom: 8, color: '#0077cc' },
-  subtitle: { fontSize: 14, textAlign: 'center', marginBottom: 24, color: '#555' },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, marginBottom: 16, backgroundColor: '#fff' },
-  button: { backgroundColor: '#0077cc', padding: 14, borderRadius: 8, marginBottom: 12 },
-  buttonText: { color: '#fff', fontWeight: '600', textAlign: 'center' },
-  link: { color: '#0077cc', textAlign: 'center', marginTop: 8 },
+  
+  button: { backgroundColor: '#0077cc', padding: 16, borderRadius: 10, marginTop: 10, elevation: 2 },
+  buttonText: { color: '#fff', fontWeight: 'bold', textAlign: 'center', fontSize: 16 },
+  link: { color: '#0077cc', textAlign: 'center', marginTop: 20 },
 });

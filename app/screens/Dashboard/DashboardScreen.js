@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 const DashboardScreen = ({ navigation }) => {
+  const [isLoading, setIsLoading] = useState(true); // Loading state added
   const [activeFilter, setActiveFilter] = useState('Today');
   const [showModal, setShowModal] = useState(false);
   
+  // Animation Ref
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
   // Date Picker States
   const [fromDate, setFromDate] = useState(new Date());
   const [toDate, setToDate] = useState(new Date());
@@ -15,7 +19,34 @@ const DashboardScreen = ({ navigation }) => {
 
   const filters = ['Today', 'Weekly', 'Monthly', 'Yearly', 'Custom'];
 
-  // Data for Recent Transactions
+  // Simulation of API Call
+  useEffect(() => {
+    // Pulse Animation Start
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.2,
+          duration: 800,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.ease),
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.ease),
+        }),
+      ])
+    ).start();
+
+    // 2.5 seconds baad data dikhayega
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   const recentBills = [
     { id: '1', customer: 'Rahul Sharma', amount: '1,200', date: '04 Feb', status: 'Paid' },
     { id: '2', customer: 'Verma Traders', amount: '5,500', date: '03 Feb', status: 'Pending' },
@@ -32,10 +63,24 @@ const DashboardScreen = ({ navigation }) => {
     }
   };
 
+  // --- 1. Animated Logo Loading UI ---
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Animated.Image 
+          source={require('../../../assets/logo.png')} // Path check kar lena babu
+          style={[styles.loadingLogo, { transform: [{ scale: pulseAnim }] }]} 
+          resizeMode="contain"
+        />
+        <Text style={styles.loadingText}>Fetching your business data...</Text>
+      </View>
+    );
+  }
+
+  // --- 2. Actual Dashboard UI ---
   return (
     <View style={{ flex: 1, backgroundColor: '#f4f7fa' }}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        
         {/* 1. Filter Bar */}
         <View style={styles.filterWrapper}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
@@ -88,7 +133,7 @@ const DashboardScreen = ({ navigation }) => {
           <ActionButton title="Add Expense" icon="remove-circle" color="#e74c3c" />
         </View>
 
-        {/* 6. Recent Transactions (FIXED: Wapas add kar diya) */}
+        {/* 6. Recent Transactions */}
         <View style={styles.recentSection}>
           <View style={styles.recentHeader}>
             <Text style={styles.recentTitle}>Recent Transactions</Text>
@@ -122,7 +167,7 @@ const DashboardScreen = ({ navigation }) => {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Custom Date Modal & Picker Code (Vaisa hi rahega) */}
+      {/* Date Modal */}
       <Modal visible={showModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -152,7 +197,7 @@ const DashboardScreen = ({ navigation }) => {
   );
 };
 
-// --- Styles & Helper Components (Shortened for brevity) ---
+// --- Helper Components ---
 const StatCard = ({ title, amount, icon, color }) => (
   <View style={[styles.statCard, { borderLeftColor: color }]}>
     <View style={{ flex: 1 }}>
@@ -180,6 +225,11 @@ const ActionButton = ({ title, icon, color }) => (
 );
 
 const styles = StyleSheet.create({
+  // New Loading Styles
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
+  loadingLogo: { width: 100, height: 100, marginBottom: 20 },
+  loadingText: { fontSize: 16, color: '#0077cc', fontWeight: '500' },
+
   filterWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingVertical: 10, elevation: 4 },
   filterScroll: { paddingLeft: 15, paddingRight: 50 },
   filterBtn: { paddingHorizontal: 15, paddingVertical: 6, borderRadius: 20, marginRight: 8, backgroundColor: '#f0f2f5' },

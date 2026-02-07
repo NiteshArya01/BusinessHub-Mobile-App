@@ -1,28 +1,68 @@
 import React from 'react';
 import { StyleSheet, View, Text,TouchableOpacity } from 'react-native';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
+import { createStackNavigator } from '@react-navigation/stack'; // Stack Navigator import karein
 import { Ionicons } from '@expo/vector-icons'; // Icons ke liye
+
+
+// Screens
 import DashboardScreen from '../screens/Dashboard/DashboardScreen';
 import InvoicesScreen from '../screens/Invoices/InvoicesScreen';
 import StockManagerScreen from '../screens/Inventory/StockManagerScreen';
 import SupplierLedgerScreen from '../screens/SupplierLedger/SupllierLedgerScreen';
+import SupplierDetailPage from '../screens/SupplierLedger/SupplierDetailPage';
 import WholesaleLedgerScreen from '../screens/WholesaleLedger/WholesaleLedgerScreen';
 import RetailLedgerScreen from '../screens/RetailLedger/RetailLedgerScreen';
 import ExpensesScreen from '../screens/Expenses/ExpensesScreen';
 import ProfitLossScreen from '../screens/Profit&Loss/ProfitLossScreen';
 
+
 const Drawer = createDrawerNavigator();
+const Stack = createStackNavigator();
+
+
+// AppNavigator.js ke andar SupplierStack ko aise update karein
+function SupplierStack({ navigation }) {
+  return (
+    <Stack.Navigator 
+      screenOptions={{ 
+        headerShown: true, // Hum Stack ka header use karenge
+        headerStyle: { backgroundColor: '#0077cc' },
+        headerTintColor: '#fff',
+      }}
+    >
+      <Stack.Screen 
+        name="SupplierLedgerMain" 
+        component={SupplierLedgerScreen} 
+        options={{ 
+          title: 'Supplier Ledger',
+          // ✅ Yahan Menu button manually add karenge takki Drawer khul sake
+          headerLeft: () => (
+            <TouchableOpacity onPress={() => navigation.openDrawer()} style={{marginLeft: 15}}>
+              <Ionicons name="menu" size={28} color="#fff" />
+            </TouchableOpacity>
+          )
+        }} 
+      />
+      <Stack.Screen 
+        name="SupplierDetailPage" 
+        component={SupplierDetailPage} 
+        options={{ title: 'Supplier Detail' }} // Yahan auto Back button aayega
+      />
+    </Stack.Navigator>
+  );
+}
 
 // 1. Custom Drawer Design (Logo aur Name ke liye)
 function CustomDrawerContent(props) {
   // Yeh function App.js ki state ko wapas false kar dega
   const handleLogout = () => {
-    // Agar aapne onLogout pass kiya hai toh use yahan call karein
+    // RootNavigator se pass kiya gaya onLogout
     if (props.onLogout) {
       props.onLogout();
     }
-    console.log("Logged Out");
   };
+
 
   return (
     <View style={{ flex: 1 }}>
@@ -62,11 +102,12 @@ function CustomDrawerContent(props) {
   );
 }
 
-export default function AppNavigator() {
+export default function AppNavigator({ onLogout }) {
   return (
     <Drawer.Navigator 
       initialRouteName="Dashboard"
-      drawerContent={(props) => <CustomDrawerContent {...props} />}
+      drawerContent={(props) => <CustomDrawerContent {...props} onLogout={onLogout} />}
+      // drawerContent={(props) => <CustomDrawerContent {...props} />}
       screenOptions={{
         headerStyle: {
           backgroundColor: '#0077cc', 
@@ -103,16 +144,18 @@ export default function AppNavigator() {
       />
       <Drawer.Screen 
         name="Supplier Ledger" 
-        component={SupplierLedgerScreen} 
-        options={{
-          drawerIcon: ({ color, size }) => <Ionicons name="people-outline" size={size} color={color} />
-        }}
+        component={SupplierStack}
+       options={{ 
+    headerShown: false, // ❌ Drawer ka header band kar diya
+    drawerIcon: ({ color, size }) => <Ionicons name="people-outline" size={size} color={color} /> 
+  }}
       />
       <Drawer.Screen 
         name="Wholesale Ledger" 
         component={WholesaleLedgerScreen} 
-        options={{
-          drawerIcon: ({ color, size }) => <Ionicons name="business-outline" size={size} color={color} />
+       options={{ 
+          headerShown: false, // ✅ Drawer ka "ganda" header band kar diya
+          drawerIcon: ({ color, size }) => <Ionicons name="people-outline" size={size} color={color} /> 
         }}
       />
       <Drawer.Screen 

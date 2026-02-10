@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Tera Book",
-    "slug": "Tera Book",
+    "name": "TeraBook",
+    "slug": "TeraBook",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/start-icon.png",

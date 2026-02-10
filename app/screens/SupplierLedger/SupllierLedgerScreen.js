@@ -1,124 +1,196 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import LoadingSpinner from '../../components/LoadingSpinner'; // Path check karein
-
+import LoadingSpinner from '../../components/LoadingSpinner'; 
+import AddSupplierModal from './AddSupplierModal'; 
+import SuppliersController from '../../controllers/SuppliersController';
+import { auth } from '../../api/firebase';
+import ConfirmModal from '../../components/ConfirmModal';
 export default function SupplierLedgerScreen({ navigation }) {
   const [isLoading, setIsLoading] = useState(true);
+  const [suppliers, setSuppliers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
-  const [suppliers, setSuppliers] = useState([
-    { id: '1', name: 'Arjun Textiles', phone: '9876543210', gstin: '08AAAAA0000A1Z5', balance: '₹15,000' },
-    { id: '2', name: 'Krishna Fab', phone: '9988776655', gstin: '08BBBBB1111B2Z6', balance: '₹4,200' },
-  ]);
+  const [selectedSupplier, setSelectedSupplier] = useState(null);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [selectedSupplierId, setSelectedSupplierId] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false); // New state for loading during delete
+  const loadSuppliers = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    const result = await SuppliersController.fetchSuppliers(uid);
+    if (result.success) setSuppliers(result.data);
+    setIsLoading(false);
+  };
 
-  useEffect(() => {
-    setTimeout(() => setIsLoading(false), 2000); // 2 sec loader
-  }, []);
+  useEffect(() => { loadSuppliers(); }, []);
 
-  // Filter list based on search
+  // const confirmDelete = (id) => {
+  //   Alert.alert("Delete Supplier", "Kya aap is ledger ko delete karna chahte hain?", [
+  //     { text: "Nahi" },
+  //     { text: "Haan, Delete", style: 'destructive', onPress: async () => {
+  //         const res = await SuppliersController.deleteSupplier(id);
+  //         if(res.success) loadSuppliers();
+  //     }}
+  //   ]);
+  // };
+
+  // Jab delete icon par click ho
+  const handleDeleteClick = (id) => {
+    setSelectedSupplierId(id);
+    setDeleteModalVisible(true);
+  };
+
+  // Jab user "Confirm" kare
+const handleConfirmDelete = async () => {
+    if (selectedSupplierId) {
+      setIsDeleting(true); // Loading start
+      const res = await SuppliersController.deleteSupplier(selectedSupplierId);
+      if (res.success) {
+        await loadSuppliers(); // List refresh
+        setDeleteModalVisible(false);
+        setSelectedSupplierId(null); // ID clear karein
+      } else {
+        Alert.alert("Error", "Could not delete supplier.");
+      }
+      setIsDeleting(false); // Loading stop
+    }
+  };
+
   const filteredSuppliers = suppliers.filter(item => 
-    item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    item.phone.includes(searchQuery)
+    item.name.toLowerCase().includes(searchQuery.toLowerCase()) || item.phone.includes(searchQuery)
   );
 
-  if (isLoading) return <LoadingSpinner message="Opening Supplier Records..." />;
+  if (isLoading) return <LoadingSpinner message="Opening Records..." />;
 
   return (
     <View style={styles.container}>
-      {/* Header with Search */}
+      {/* Search & Add Header */}
       <View style={styles.headerContainer}>
         <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color="#888" />
+          <Ionicons name="search" size={18} color="#888" />
           <TextInput 
-            placeholder="Search Supplier by Name or Phone..." 
+            placeholder="Search Name/Phone" 
             style={styles.searchInput}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
         </View>
-        <TouchableOpacity style={styles.addBtnCircle} onPress={() => setModalVisible(true)}>
-          <Ionicons name="add" size={30} color="#fff" />
+        <TouchableOpacity style={styles.addBtn} onPress={() => { setSelectedSupplier(null); setModalVisible(true); }}>
+          <Ionicons name="add" size={28} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      <FlatList
+<FlatList
+  data={filteredSuppliers}
+  keyExtractor={(item) => item.id}
+  // --- Ye section add karein ---
+  ListEmptyComponent={() => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="document-text-outline" size={50} color="#ccc" />
+      <Text style={styles.emptyText}>No Record Found</Text>
+    </View>
+  )}
+  // -----------------------------
+  renderItem={({ item }) => (
+    <TouchableOpacity 
+      style={styles.card} 
+      onPress={() => navigation.navigate('SupplierDetailPage', { supplier: item })}
+    >
+      <View style={{flex: 1}}>
+        <Text style={styles.cardName}>{item.name}</Text>
+        <Text style={styles.cardSub}>📞 {item.phone}</Text>
+      </View>
+      <View style={{ alignItems: 'flex-end' }}>
+        <Text style={[styles.cardBalance, { color: item.balanceType === 'Cr' ? '#e74c3c' : '#2ecc71' }]}>
+          ₹{item.amount || 0} {item.balanceType}
+        </Text>
+        <View style={styles.actionRow}>
+          <TouchableOpacity onPress={() => { setSelectedSupplier(item); setModalVisible(true); }}>
+            <Ionicons name="pencil" size={18} color="#0077cc" style={{marginRight: 15}} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => handleDeleteClick(item.id)}>
+            <Ionicons name="trash" size={18} color="#e74c3c" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </TouchableOpacity>
+  )}
+  contentContainerStyle={{ padding: 15, flexGrow: 1 }} // flexGrow: 1 zaroori hai center karne ke liye
+/>
+      {/* <FlatList
         data={filteredSuppliers}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('SupplierDetailPage', { supplier: item })}>
-            <View>
+          <TouchableOpacity 
+            style={styles.card} 
+            onPress={() => navigation.navigate('SupplierDetailPage', { supplier: item })}
+          >
+            <View style={{flex: 1}}>
               <Text style={styles.cardName}>{item.name}</Text>
-              <Text style={styles.cardSub}>GST: {item.gstin}</Text>
               <Text style={styles.cardSub}>📞 {item.phone}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.cardBalance}>{item.balance}</Text>
-              <View style={styles.actionIcons}>
-                <Ionicons name="pencil" size={18} color="#0077cc" style={{marginRight: 15}} />
-                <Ionicons name="trash" size={18} color="#e74c3c" />
+              <Text style={[styles.cardBalance, { color: item.balanceType === 'Cr' ? '#e74c3c' : '#2ecc71' }]}>
+                ₹{item.amount || 0} {item.balanceType}
+              </Text>
+              <View style={styles.actionRow}>
+                <TouchableOpacity onPress={() => { setSelectedSupplier(item); setModalVisible(true); }}>
+                  <Ionicons name="pencil" size={18} color="#0077cc" style={{marginRight: 15}} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleDeleteClick(item.id)}>
+                  <Ionicons name="trash" size={18} color="#e74c3c" />
+                </TouchableOpacity>
               </View>
             </View>
           </TouchableOpacity>
         )}
         contentContainerStyle={{ padding: 15 }}
+      /> */}
+
+      <AddSupplierModal 
+        visible={modalVisible} 
+        supplierToEdit={selectedSupplier}
+        onClose={() => setModalVisible(false)} 
+        onSave={loadSuppliers} 
       />
 
-      {/* Add New Supplier Modal (Popup) */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add New Supplier</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={28} color="#333" />
-              </TouchableOpacity>
-            </View>
+      <ConfirmModal 
+        visible={deleteModalVisible}
+        title="Delete Ledger?"
+        message="Are you sure you want to delete this supplier? This action cannot be undone."
+        confirmText="Yes, Delete"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteModalVisible(false)}
+      />
 
-            <ScrollView>
-              <TextInput style={styles.input} placeholder="Supplier Name *" />
-              <TextInput style={styles.input} placeholder="Phone Number *" keyboardType="numeric" />
-              <TextInput style={styles.input} placeholder="GSTIN No." />
-              <TextInput style={styles.input} placeholder="Address" />
-              
-              <View style={styles.divider} />
-              <Text style={styles.subTitle}>Bank Details</Text>
-              <TextInput style={styles.input} placeholder="Account Number" keyboardType="numeric" />
-              <TextInput style={styles.input} placeholder="Bank Name" />
-              <TextInput style={styles.input} placeholder="IFSC Code" />
-              
-              {/* ✅ Fixed Submit Button */}
-              <TouchableOpacity style={styles.submitBtn} onPress={() => setModalVisible(false)}>
-                <Text style={styles.submitText}>Save Supplier Ledger</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f7fa' },
-  headerContainer: { flexDirection: 'row', padding: 15, backgroundColor: '#fff', alignItems: 'center', elevation: 4 },
-  searchBar: { flex: 1, flexDirection: 'row', backgroundColor: '#f0f2f5', borderRadius: 10, paddingHorizontal: 10, alignItems: 'center', height: 45 },
-  searchInput: { flex: 1, marginLeft: 10, fontSize: 14 },
-  addBtnCircle: { backgroundColor: '#0077cc', width: 45, height: 45, borderRadius: 22.5, justifyContent: 'center', alignItems: 'center', marginLeft: 10 },
-  
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 15, marginBottom: 15, flexDirection: 'row', justifyContent: 'space-between', elevation: 2 },
-  cardName: { fontSize: 16, fontWeight: 'bold' },
+  headerContainer: { flexDirection: 'row', padding: 15, backgroundColor: '#fff', alignItems: 'center', elevation: 3 },
+  searchBar: { flex: 1, flexDirection: 'row', backgroundColor: '#f0f2f5', borderRadius: 8, paddingHorizontal: 10, alignItems: 'center', height: 40 },
+  searchInput: { flex: 1, marginLeft: 8, fontSize: 14 },
+  addBtn: { backgroundColor: '#0077cc', width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginLeft: 10 },
+  card: { backgroundColor: '#fff', borderRadius: 10, padding: 15, marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', elevation: 1 },
+  cardName: { fontSize: 15, fontWeight: 'bold' },
   cardSub: { fontSize: 12, color: '#666', marginTop: 2 },
-  cardBalance: { fontSize: 16, fontWeight: 'bold', color: '#e74c3c' },
-  actionIcons: { flexDirection: 'row', marginTop: 10 },
-
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 20, height: '80%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#0077cc' },
-  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12, marginBottom: 12 },
-  divider: { height: 1, backgroundColor: '#eee', marginVertical: 10 },
-  subTitle: { fontSize: 14, fontWeight: 'bold', color: '#666', marginBottom: 10 },
-  submitBtn: { backgroundColor: '#0077cc', padding: 15, borderRadius: 10, alignItems: 'center', marginTop: 10, marginBottom: 20 },
-  submitText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
+  cardBalance: { fontSize: 15, fontWeight: 'bold' },
+  actionRow: { flexDirection: 'row', marginTop: 8 },
+  emptyContainer: {
+    flex: 1,                // Puri available jagah lega
+    justifyContent: 'center', // Vertical center
+    alignItems: 'center',     // Horizontal center
+    // Agar header ki wajah se thoda niche dikhana hai toh 
+    // paddingBottom ya marginBottom add kar sakte hain
+    paddingBottom: 100,      
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#999',
+    marginTop: 10,
+    fontWeight: '500',
+  },
 });

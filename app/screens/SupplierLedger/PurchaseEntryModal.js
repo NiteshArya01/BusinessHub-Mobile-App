@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   View, Text, Modal, TouchableOpacity, ScrollView, 
   StyleSheet, KeyboardAvoidingView, Platform, Alert 
@@ -8,12 +8,13 @@ import * as DocumentPicker from 'expo-document-picker';
 import SimpleVoucher from './SimpleVoucher'; 
 import InventoryBill from './InventoryBill';
 
-const PurchaseEntryModal = ({ visible, onClose }) => {
+const PurchaseEntryModal = ({ visible, onClose,supplier,refreshList }) => {
   const [activeTab, setActiveTab] = useState('simple');
   const [billNo, setBillNo] = useState('');
   const [items, setItems] = useState([{ id: Date.now(), name: '', qty: '', price: '' }]);
   const [selectedFile, setSelectedFile] = useState(null);
   
+
   // --- Functions ---
 
   const pickDocument = async () => {
@@ -77,7 +78,7 @@ const PurchaseEntryModal = ({ visible, onClose }) => {
             <View style={styles.sheetHeader}>
               <View>
                 <Text style={styles.sheetTitle}>New Entry</Text>
-                <Text style={styles.subTitle}>Select entry type below</Text>
+                <Text style={styles.subTitle}>Add bill details for stock received from {supplier?.name}</Text>
               </View>
               <TouchableOpacity onPress={onClose}>
                 <Ionicons name="close-circle" size={32} color="#ccc" />
@@ -107,17 +108,20 @@ const PurchaseEntryModal = ({ visible, onClose }) => {
               {activeTab === 'simple' ? (
                 <View>
                   <SimpleVoucher 
-                    billNo={billNo} setBillNo={setBillNo}
-                    selectedFile={selectedFile} onPickFile={pickDocument}
-                    onRemoveFile={() => setSelectedFile(null)}
+                    party={supplier} 
+                    onEntrySuccess={() => {
+                      refreshList();
+                      onClose(); // Modal close karein
+                      // fetchLatestList(); // Supplier list/ledger update karein
+                    }}
                   />
                   {/* Simple Entry ke liye direct Save button */}
-                  <TouchableOpacity 
+                  {/* <TouchableOpacity 
                     style={styles.saveBtn} 
                     onPress={() => handleFinalSave({ type: 'voucher', billNo, file: selectedFile })}
                   >
                     <Text style={styles.saveBtnText}>Save Voucher</Text>
-                  </TouchableOpacity>
+                  </TouchableOpacity> */}
                 </View>
               ) : (
                 /* Inventory Bill khud apna Preview aur Save handle karega */
@@ -165,8 +169,10 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 0, 
     borderBottomRightRadius: 0,
     paddingHorizontal: 20, 
-    paddingBottom: Platform.OS === 'ios' ? 40 : 10, 
-    maxHeight: '92%', 
+    // Isse button niche se thoda upar rahega aur clear dikhega
+    paddingBottom: Platform.OS === 'ios' ? 40 : 25, 
+    // Height badha kar 95% kar di hai taaki content aur button ko jagah mile
+    maxHeight: '97%', 
     width: '100%',
     elevation: 20,
     shadowColor: '#000',
@@ -187,16 +193,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row', 
     justifyContent: 'space-between', 
     alignItems: 'center', 
-    marginBottom: 20,
+    marginBottom: 15, // Gap thoda kam kiya content adjust karne ke liye
   },
-  sheetTitle: { fontSize: 16, fontWeight: 'bold', color: '#0077cc' },
+  sheetTitle: { fontSize: 18, fontWeight: 'bold', color: '#0077cc' },
   subTitle: { fontSize: 13, color: '#7f8c8d', marginTop: -2 },
   tabContainer: { 
     flexDirection: 'row', 
     backgroundColor: '#f2f4f7', 
     borderRadius: 14, 
     padding: 4, 
-    marginBottom: 20 
+    marginBottom: 15 // Margins ko thoda tight kiya hai
   },
   tab: { 
     flex: 1, 
@@ -219,10 +225,11 @@ const styles = StyleSheet.create({
   saveBtn: { 
     backgroundColor: '#0077cc', 
     padding: 15, 
-    borderRadius: 12, 
+    borderRadius: 10, 
     alignItems: 'center', 
-    marginTop: 10,
-    marginBottom: Platform.OS === 'android' ? 10 : 0,
+    marginTop: 15,
+    // Android ke liye extra bottom margin taaki navigation buttons se dur rahe
+    marginBottom: Platform.OS === 'android' ? 20 : 0, 
   },
   saveBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
 });

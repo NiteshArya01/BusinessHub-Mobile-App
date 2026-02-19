@@ -81,46 +81,17 @@ const handleConfirmDelete = async () => {
         </TouchableOpacity>
       </View>
 
-<FlatList
-  data={filteredSuppliers}
-  keyExtractor={(item) => item.id}
-  // --- Ye section add karein ---
-  ListEmptyComponent={() => (
-    <View style={styles.emptyContainer}>
-      <Ionicons name="document-text-outline" size={50} color="#ccc" />
-      <Text style={styles.emptyText}>No Record Found</Text>
-    </View>
-  )}
-  // -----------------------------
-  renderItem={({ item }) => (
-    <TouchableOpacity 
-      style={styles.card} 
-      onPress={() => navigation.navigate('SupplierDetailPage', { supplier: item })}
-    >
-      <View style={{flex: 1}}>
-        <Text style={styles.cardName}>{item.name}</Text>
-        <Text style={styles.cardSub}>📞 {item.phone}</Text>
-      </View>
-      <View style={{ alignItems: 'flex-end' }}>
-        <Text style={[styles.cardBalance, { color: item.balanceType === 'Cr' ? '#e74c3c' : '#2ecc71' }]}>
-          ₹{item.amount || 0} {item.balanceType}
-        </Text>
-        <View style={styles.actionRow}>
-          <TouchableOpacity onPress={() => { setSelectedSupplier(item); setModalVisible(true); }}>
-            <Ionicons name="pencil" size={18} color="#0077cc" style={{marginRight: 15}} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleDeleteClick(item.id)}>
-            <Ionicons name="trash" size={18} color="#e74c3c" />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </TouchableOpacity>
-  )}
-  contentContainerStyle={{ padding: 15, flexGrow: 1 }} // flexGrow: 1 zaroori hai center karne ke liye
-/>
-      {/* <FlatList
+      <FlatList
         data={filteredSuppliers}
         keyExtractor={(item) => item.id}
+        // --- Ye section add karein ---
+        ListEmptyComponent={() => (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="document-text-outline" size={50} color="#ccc" />
+            <Text style={styles.emptyText}>No Record Found</Text>
+          </View>
+        )}
+        // -----------------------------
         renderItem={({ item }) => (
           <TouchableOpacity 
             style={styles.card} 
@@ -145,8 +116,9 @@ const handleConfirmDelete = async () => {
             </View>
           </TouchableOpacity>
         )}
-        contentContainerStyle={{ padding: 15 }}
-      /> */}
+        contentContainerStyle={{ padding: 15, flexGrow: 1 }} // flexGrow: 1 zaroori hai center karne ke liye
+      />
+
 
       <AddSupplierModal 
         visible={modalVisible} 

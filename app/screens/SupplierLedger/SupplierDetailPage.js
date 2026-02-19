@@ -2,12 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
+import { fetchSupplierLedgerPaginated,savePaymentEntry } from '../../controllers/PurchaseController';
 
 // Custom Components
 import LoadingSpinner from '../../components/LoadingSpinner';
+import TransactionFilters from './TransactionFilters';
 import TransactionList from './TransactionList';
 import PurchaseEntryModal from './PurchaseEntryModal';
 import PaymentEntryModal from './PaymentEntryModal';
+
+const defaultFilter = {
+  type: null,
+  entrySide: null,
+  dateFilter: "today",
+  fromDate: null,
+  toDate: null
+};
+
 export default function SupplierDetailPage({ route, navigation }) {
   const { supplier } = route.params || {};
   const [isLoading, setIsLoading] = useState(true);
@@ -19,19 +30,96 @@ export default function SupplierDetailPage({ route, navigation }) {
 
   const [amount, setAmount] = useState('');
   const [billNo, setBillNo] = useState('');
-
-  const [transactions, setTransactions] = useState([
-    { id: '1', date: '05 Feb 2026', type: 'Purchase', amount: '12,000', remark: 'Bill #101', mode: '-', balType: 'Cr' },
-    { id: '2', date: '06 Feb 2026', type: 'Payment', amount: '5,000', remark: 'Cash', mode: 'Cash', balType: 'Dr' },
-  ]);
  
   // States to control visibility
   const [purchaseModalVisible, setPurchaseModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+
+  // Transaction data state
+  const [transactions, setTransactions] = useState([]);
+  const [lastDoc, setLastDoc] = useState(null);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+
+  // Filter State
+  const [filters, setFilters] = useState(defaultFilter);
+
+
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 1000);
-    return () => clearTimeout(timer);
-  }, []);
+    if (supplier?.id) {
+      resetAndLoad();
+    }
+  }, [supplier?.id]);
+
+  const resetAndLoad = async () => {
+    setLastDoc(null);
+    setTransactions([]);
+    await loadTransactions(true);
+  };
+
+  const loadTransactions = async (isFirstLoad = false) => {
+    if (!supplier?.id) return;
+
+    if (isFirstLoad) {
+      setIsLoading(true);
+    } else {
+      setIsFetchingMore(true);
+    }
+
+    try {
+      const result = await fetchSupplierLedgerPaginated({
+        supplierId: supplier.id,
+        lastDoc: isFirstLoad ? null : lastDoc,
+        pageSize: 20
+      });
+
+      if (result.success) {
+        if (isFirstLoad) {
+          setTransactions(result.data);
+        } else {
+          setTransactions(prev => [...prev, ...result.data]);
+        }
+
+        setLastDoc(result.lastVisible);
+      }
+
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+      setIsFetchingMore(false);
+    }
+  };
+
+  const handleLoadMore = async () => {
+    if (!hasMore || isFetchingMore) return;
+
+    setIsFetchingMore(true);
+
+    const result = await fetchSupplierLedgerPaginated({
+      supplierId: supplier.id,
+      lastDoc
+    });
+
+    if (result.success) {
+      setTransactions(prev => [...prev, ...result.data]);
+      setLastDoc(result.lastDoc);
+      setHasMore(result.hasMore);
+    }
+
+    setIsFetchingMore(false);
+  };
+
+  const handleTransectionEdit = (transaction) => {
+    Alert.alert("Edit", `You want to edit transaction: ${transaction.id}`);
+    // Yahan aap edit logic implement kar sakte hain
+  }
+
+  const handleTransectionDelete = (transaction) => {
+    Alert.alert(
+      "Confirm Delete", 
+    )
+  }
 
   const handleOpenModal = (type) => {
     if (type === 'Purchase') {
@@ -50,9 +138,39 @@ export default function SupplierDetailPage({ route, navigation }) {
     Alert.alert("Success", `${transType} added successfully`);
   };
 
-  const handleSavePayment = (data) => {
-  console.log("Payment Recorded:", data);
-  // Add logic to update your balance
+
+
+const handleSavePayment = async (data) => {
+  try {
+    // 1. Data ko prepare karo (partyId modal se nahi mil raha tha, use yahan add karo)
+    // Maan lijiye aapke paas 'currentSupplier' ki state hai
+    const paymentData = {
+      ...data,
+      partyId: supplier.id, // Supplier ki ID yahan se pass hogi
+      type: 'Payment'
+    };
+
+    //console.log("Saving to Firebase...", paymentData);
+
+    // 2. Controller call karo
+    const result = await savePaymentEntry(paymentData);
+
+    if (result.success) {
+      // 3. Success Feedback
+      Alert.alert("Success", "Payment saved successfully!");
+      
+      // 4. Local state update karo ya ledger refresh karo
+      resetAndLoad();
+      
+      // Modal close karne ki tension nahi, wo resetAndClose() se handle ho jayega
+    } else {
+      // 4. Error Feedback
+      Alert.alert("Error", result.message);
+    }
+  } catch (error) {
+    console.error("Save Error:", error);
+    Alert.alert("Error", "Kuch gadbad ho gayi!");
+  }
 };
 
   if (isLoading) return <LoadingSpinner message={`Opening ${supplier?.name}'s Ledger...`} />;
@@ -142,27 +260,33 @@ export default function SupplierDetailPage({ route, navigation }) {
       )}
     </View>
 
-      {/* 2. FILTERS */}
-      <View style={styles.filterSection}>
-        <View style={styles.filterRow}>
-          <View style={styles.chipContainer}>
-            {['All', 'Cr', 'Dr'].map(f => (
-              <TouchableOpacity key={f} style={[styles.chip, typeFilter === f && styles.activeChip]} onPress={() => setTypeFilter(f)}>
-                <Text style={[styles.chipText, typeFilter === f && styles.activeChipText]}>{f}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={styles.timelineBox}>
-            <Picker selectedValue={dateFilter} onValueChange={(v) => setDateFilter(v)} style={styles.picker}>
-              <Picker.Item label="Weekly" value="Weekly" />
-              <Picker.Item label="Monthly" value="Monthly" />
-            </Picker>
-          </View>
-        </View>
-      </View>
+    {/* 2. TRANSACTION FILTERS COMPONENT */}
+      
+      <TransactionFilters
+        onApplyFilter={(data) => {
+          setFilters(data);
+          // Check karo fetchTransactions define hai ya nahi
+          if (typeof fetchTransactions === 'function') {
+            fetchTransactions({ ...data, page: 1 });
+          }
+        }}
+        onExportPDF={() => console.log("Exporting PDF...")}
+        onExportExcel={() => console.log("Exporting Excel...")}
+        onSync={() => console.log("Syncing...")}
+      />
+      {/* Tera List Component niche aayega */}
+ 
 
       {/* 3. TRANSACTION LIST COMPONENT */}
-      <TransactionList transactions={transactions} />
+
+      <TransactionList
+        transactions={transactions}
+        onLoadMore={handleLoadMore}
+        isFetchingMore={isFetchingMore}
+        hasMore={hasMore}
+        onEdit={handleTransectionEdit}
+        onDelete={handleTransectionDelete}
+      />
 
       {/* 4. BOTTOM ACTION BUTTONS */}
       <View style={styles.actionFooter}>
@@ -177,13 +301,12 @@ export default function SupplierDetailPage({ route, navigation }) {
       {/* 5. REUSABLE ENTRY MODAL */}
       <PurchaseEntryModal 
         visible={purchaseModalVisible}
-        type={transType}
-        amount={amount}
-        setAmount={setAmount}
-        billNo={billNo}
-        setBillNo={setBillNo}
+        supplier={supplier}
         onClose={() => setPurchaseModalVisible(false)}
-        onConfirm={handleSaveEntry}
+        refreshList={()=>{
+          resetAndLoad();
+          // loadTransactions();
+        }}
       />
 
 

@@ -8,13 +8,23 @@ import * as DocumentPicker from 'expo-document-picker';
 import SimpleVoucher from './SimpleVoucher'; 
 import InventoryBill from './InventoryBill';
 
-const PurchaseEntryModal = ({ visible, onClose,supplier,refreshList }) => {
+const PurchaseEntryModal = ({ visible, onClose,supplier,editTransaction,refreshList }) => {
   const [activeTab, setActiveTab] = useState('simple');
   const [billNo, setBillNo] = useState('');
   const [items, setItems] = useState([{ id: Date.now(), name: '', qty: '', price: '' }]);
   const [selectedFile, setSelectedFile] = useState(null);
   
 
+  // useEffect(() => {
+  //   if (editTransaction) {
+  //     console.log("Editing Transaction:", editTransaction);
+  //     setBillNo(editTransaction.details?.billNumber || '');
+  //     // setRemarks(editTransaction.details?.remarks || '');
+  //     // const [day, month, year] = editTransaction.date.split('/');
+  //     // setDate(new Date(year, month - 1, day));
+  //     // if (editTransaction.details?.items) setItems(editTransaction.details.items);
+  //   }
+  // }, [editTransaction]);
   // --- Functions ---
 
   const pickDocument = async () => {
@@ -34,9 +44,6 @@ const PurchaseEntryModal = ({ visible, onClose,supplier,refreshList }) => {
 
   // Jab InventoryBill ya SimpleVoucher se data finalize hoga
   const handleFinalSave = (finalData) => {
-    // Yahan finalData mein items, GST, totals, etc. sab milega
-    console.log("Saving Final Transaction:", finalData);
-    
     Alert.alert(
       "Success", 
       `${activeTab === 'simple' ? 'Voucher' : 'Inventory Bill'} has been saved!`,
@@ -77,8 +84,8 @@ const PurchaseEntryModal = ({ visible, onClose,supplier,refreshList }) => {
             
             <View style={styles.sheetHeader}>
               <View>
-                <Text style={styles.sheetTitle}>New Entry</Text>
-                <Text style={styles.subTitle}>Add bill details for stock received from {supplier?.name}</Text>
+                <Text style={styles.sheetTitle}>Purchase Entry</Text>
+                {/* <Text style={styles.subTitle}>Add bill details for stock received from {supplier?.name}</Text> */}
               </View>
               <TouchableOpacity onPress={onClose}>
                 <Ionicons name="close-circle" size={32} color="#ccc" />
@@ -109,6 +116,7 @@ const PurchaseEntryModal = ({ visible, onClose,supplier,refreshList }) => {
                 <View>
                   <SimpleVoucher 
                     party={supplier} 
+                    editTransaction={editTransaction}
                     onEntrySuccess={() => {
                       refreshList();
                       onClose(); // Modal close karein

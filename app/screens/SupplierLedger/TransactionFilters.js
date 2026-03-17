@@ -20,10 +20,11 @@ const TransactionFilters = ({
 }) => {
   const today = new Date();
   const primaryBlue = "#0077cc";
-  const paymentDark = "#1e293b"; // Dark color as per your image
+  const paymentDark = "#1e293b"; 
+  const allNeutral = "#475569"; // Neutral color for 'All'
 
   const [filter, setFilter] = useState({
-    type: "Purchase",
+    type: "All", // Default set to All
     dateFilter: "Today",
     fromDate: today,
     toDate: today,
@@ -73,8 +74,19 @@ const TransactionFilters = ({
         <Text style={styles.sectionTitle}>Report Section</Text>
         
         <View style={styles.mainRow}>
-          {/* 1. Toggle Switch */}
+          {/* 1. Toggle Switch (All, Purchase, Payment) */}
           <View style={styles.toggleWrapper}>
+            {/* ALL Option */}
+            <TouchableOpacity
+              onPress={() => updateFilter("type", "All")}
+              style={[styles.toggleTab, filter.type === "All" && { backgroundColor: allNeutral }]}
+            >
+              <Text style={[styles.toggleText, filter.type === "All" ? styles.whiteText : {color: '#64748b'}]}>
+                All
+              </Text>
+            </TouchableOpacity>
+
+            {/* PURCHASE Option */}
             <TouchableOpacity
               onPress={() => updateFilter("type", "Purchase")}
               style={[styles.toggleTab, filter.type === "Purchase" && { backgroundColor: primaryBlue }]}
@@ -83,6 +95,8 @@ const TransactionFilters = ({
                 Purchase
               </Text>
             </TouchableOpacity>
+
+            {/* PAYMENT Option */}
             <TouchableOpacity
               onPress={() => updateFilter("type", "Payment")}
               style={[styles.toggleTab, filter.type === "Payment" && { backgroundColor: paymentDark }]}
@@ -107,11 +121,11 @@ const TransactionFilters = ({
             style={styles.moreBtn} 
             onPress={() => { triggerHaptic(); setShowActionMenu(!showActionMenu); setShowPeriodDropdown(false); }}
           >
-            <Entypo name="dots-three-vertical" size={18} color="#444" />
+            <CircleMenuIcon color="#444" />
           </TouchableOpacity>
         </View>
 
-        {/* PERIOD DROPDOWN OVERLAY (WITH CHECKMARK) */}
+        {/* PERIOD DROPDOWN OVERLAY */}
         {showPeriodDropdown && (
           <View style={styles.periodMenu}>
             {periods.map((p) => (
@@ -190,18 +204,25 @@ const TransactionFilters = ({
   );
 };
 
+// Simple Icon component for the three dots
+const CircleMenuIcon = ({color}) => (
+  <View style={{flexDirection: 'column', gap: 2}}>
+    {[1, 2, 3].map(i => <View key={i} style={{width: 3.5, height: 3.5, borderRadius: 2, backgroundColor: color}} />)}
+  </View>
+);
+
 const styles = StyleSheet.create({
   container: { paddingHorizontal: 10, paddingVertical: 5, zIndex: 100 },
   card: { backgroundColor: "#fff", borderRadius: 16, padding: 12, elevation: 4, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 6, zIndex: 10 },
   sectionTitle: { fontSize: 11, fontWeight: "700", color: "#94a3b8", marginBottom: 10, marginLeft: 2 },
   mainRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  toggleWrapper: { flexDirection: "row", backgroundColor: "#f1f5f9", borderRadius: 12, padding: 3, flex: 1, marginRight: 10 },
+  toggleWrapper: { flexDirection: "row", backgroundColor: "#f1f5f9", borderRadius: 12, padding: 3, flex: 1.5, marginRight: 8 },
   toggleTab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: "center" },
-  toggleText: { fontSize: 13, fontWeight: "600" },
+  toggleText: { fontSize: 12, fontWeight: "700" },
   whiteText: { color: "#fff" },
-  dropdownBtn: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: "#e2e8f0", marginRight: 5, minWidth: 95, justifyContent: 'space-between' },
-  dropdownValueText: { fontSize: 13, fontWeight: "600", color: "#334155" },
-  moreBtn: { padding: 8 },
+  dropdownBtn: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", paddingHorizontal: 8, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: "#e2e8f0", marginRight: 5, minWidth: 85, justifyContent: 'space-between' },
+  dropdownValueText: { fontSize: 12, fontWeight: "600", color: "#334155" },
+  moreBtn: { padding: 8, justifyContent: 'center', alignItems: 'center' },
   periodMenu: { position: "absolute", top: 65, right: 60, backgroundColor: "#fff", width: 140, borderRadius: 12, elevation: 12, borderWidth: 1, borderColor: "#f1f5f9", zIndex: 100, paddingVertical: 5 },
   actionMenu: { position: "absolute", top: 65, right: 10, backgroundColor: "#fff", width: 210, borderRadius: 12, elevation: 12, borderWidth: 1, borderColor: "#f1f5f9", zIndex: 100 },
   menuItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderBottomWidth: 1, borderBottomColor: "#f1f5f9" },

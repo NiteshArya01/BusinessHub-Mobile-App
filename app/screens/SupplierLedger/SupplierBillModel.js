@@ -1,53 +1,142 @@
-import React from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useState } from 'react';
+import { 
+  Modal, 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  Dimensions, 
+  Image, 
+  ActivityIndicator, 
+  Alert 
+} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+// 🔥 FIX: Importing from the legacy path as required by the new Expo version
+import * as FileSystem from 'expo-file-system/legacy'; 
+import * as Sharing from 'expo-sharing';
 
 const { height } = Dimensions.get('window');
 
 const SupplierBillModal = ({ visible, onClose, billData }) => {
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(true);
+
+  const isPdf = billData?.toLowerCase().endsWith('.pdf');
+
+  /**
+   * Orchestrates the secure download and cross-platform sharing of the attachment.
+   */
+  const handleDownloadAndOpen = async () => {
+    if (!billData) return;
+
+    try {
+      setIsProcessing(true);
+      
+      const fileExtension = isPdf ? 'pdf' : 'jpg';
+      const fileName = `Document_${Date.now()}.${fileExtension}`;
+      // Using cacheDirectory for temporary storage before sharing
+      const fileUri = FileSystem.cacheDirectory + fileName;
+
+      // Executing the download via the legacy FileSystem API
+      const downloadResult = await FileSystem.downloadAsync(billData, fileUri);
+
+      if (downloadResult.status === 200) {
+        // Checking for system sharing availability
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(downloadResult.uri);
+        } else {
+          Alert.alert("System Error", "The sharing module is not supported on this device.");
+        }
+      } else {
+        throw new Error("Server responded with a non-200 status code.");
+      }
+    } catch (error) {
+      console.error("File Access Error:", error);
+      Alert.alert(
+        "Download Error", 
+        "An unexpected error occurred while accessing the document. Please try again later."
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
-    <Modal
-      animationType="slide"
-      transparent={true}
-      visible={visible}
+    <Modal 
+      animationType="slide" 
+      transparent={true} 
+      visible={visible} 
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Transaction Bill</Text>
-            <TouchableOpacity onPress={onClose}>
-              <MaterialCommunityIcons name="close-circle" size={28} color="#666" />
+        <TouchableOpacity 
+          style={styles.dismissOverlay} 
+          activeOpacity={1} 
+          onPress={onClose} 
+        />
+
+        <View style={styles.sheetContainer}>
+          <View style={styles.dragHandle} />
+
+          <View style={styles.modalHeader}>
+            <View>
+              <Text style={styles.mainTitle}>Document Preview</Text>
+              <Text style={styles.subTitleText}>Cloud-Based Attachment</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} disabled={isProcessing}>
+              <MaterialCommunityIcons name="close-circle" size={30} color="#bdc3c7" />
             </TouchableOpacity>
           </View>
 
-          {/* Body */}
-          <View style={styles.body}>
+          <View style={styles.contentBody}>
             {!billData ? (
-              <View style={styles.noBillContainer}>
-                <MaterialCommunityIcons name="file-remove-outline" size={80} color="#ccc" />
-                <Text style={styles.noBillText}>No bill created or uploaded for this transaction.</Text>
+              <View style={styles.emptyState}>
+                <MaterialCommunityIcons name="file-search-outline" size={80} color="#ecf0f1" />
+                <Text style={styles.emptyStateText}>No attachment associated with this entry.</Text>
+              </View>
+            ) : isPdf ? (
+              <View style={styles.pdfCardContainer}>
+                <MaterialCommunityIcons name="file-pdf-box" size={100} color="#e74c3c" />
+                <Text style={styles.pdfHeader}>Portable Document Format (PDF)</Text>
+                <Text style={styles.fileNameLabel} numberOfLines={1}>
+                  {billData.split('/').pop()}
+                </Text>
+                
+                <TouchableOpacity 
+                  style={[styles.primaryActionBtn, isProcessing && styles.btnDisabled]} 
+                  onPress={handleDownloadAndOpen}
+                  disabled={isProcessing}
+                >
+                  {isProcessing ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <MaterialCommunityIcons name="cloud-download-outline" size={22} color="#fff" />
+                      <Text style={styles.btnLabel}>Download & View File</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                <Text style={styles.instructionText}>Click to open in your system's default viewer.</Text>
               </View>
             ) : (
-              <View style={styles.billPreview}>
-                <MaterialCommunityIcons name="file-check" size={50} color="#2ecc71" />
-                <Text style={styles.billFoundText}>Bill Found!</Text>
-                <Text style={styles.fileLabel}>File: {billData.split('/').pop()}</Text>
-                
-                {/* Yahan Future mein Image ya PDF Viewer aayega */}
-                <View style={styles.placeholderBox}>
-                  <Text style={styles.placeholderText}>
-                    [ Content Viewer Implementation Pending ]
-                  </Text>
-                </View>
+              <View style={styles.imageWrapper}>
+                {isImageLoading && <ActivityIndicator style={styles.loaderCenter} size="large" color="#3498db" />}
+                <Image
+                  source={{ uri: billData }}
+                  style={styles.previewImage}
+                  resizeMode="contain"
+                  onLoadEnd={() => setIsImageLoading(false)}
+                />
               </View>
             )}
           </View>
 
-          {/* Footer Action */}
-          <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-            <Text style={styles.closeBtnText}>Done</Text>
+          <TouchableOpacity 
+            style={styles.footerCloseBtn} 
+            onPress={onClose}
+            disabled={isProcessing}
+          >
+            <Text style={styles.footerCloseText}>Dismiss</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -56,37 +145,28 @@ const SupplierBillModal = ({ visible, onClose, billData }) => {
 };
 
 const styles = StyleSheet.create({
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { 
-    backgroundColor: '#fff', 
-    borderTopLeftRadius: 25, 
-    borderTopRightRadius: 25, 
-    height: height * 0.7, 
-    padding: 20 
-  },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-  body: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  noBillContainer: { alignItems: 'center' },
-  noBillText: { marginTop: 15, fontSize: 16, color: '#888', textAlign: 'center', paddingHorizontal: 40 },
-  billPreview: { alignItems: 'center', width: '100%' },
-  billFoundText: { fontSize: 18, fontWeight: 'bold', color: '#2ecc71', marginTop: 10 },
-  fileLabel: { fontSize: 12, color: '#666', marginTop: 5 },
-  placeholderBox: { 
-    marginTop: 20, 
-    width: '100%', 
-    height: 150, 
-    backgroundColor: '#f9f9f9', 
-    borderRadius: 10, 
-    borderWidth: 1, 
-    borderColor: '#eee', 
-    borderStyle: 'dashed', 
-    justifyContent: 'center', 
-    alignItems: 'center' 
-  },
-  placeholderText: { color: '#999', fontSize: 12 },
-  closeBtn: { backgroundColor: '#3498db', padding: 15, borderRadius: 10, alignItems: 'center', marginTop: 20 },
-  closeBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+  dismissOverlay: { ...StyleSheet.absoluteFillObject },
+  sheetContainer: { backgroundColor: '#fff', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: 25, paddingBottom: 35 },
+  dragHandle: { width: 45, height: 5, backgroundColor: '#f1f1f1', borderRadius: 10, alignSelf: 'center', marginTop: 12, marginBottom: 15 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  mainTitle: { fontSize: 20, fontWeight: '800', color: '#2c3e50' },
+  subTitleText: { fontSize: 12, color: '#95a5a6', marginTop: 2 },
+  contentBody: { minHeight: 320, backgroundColor: '#fcfcfc', borderRadius: 20, borderWidth: 1, borderColor: '#f1f1f1', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  pdfCardContainer: { alignItems: 'center', padding: 25 },
+  pdfHeader: { fontSize: 16, fontWeight: '700', color: '#2c3e50', marginTop: 10 },
+  fileNameLabel: { fontSize: 11, color: '#bdc3c7', marginBottom: 25, width: 200, textAlign: 'center' },
+  primaryActionBtn: { backgroundColor: '#e74c3c', flexDirection: 'row', paddingVertical: 16, paddingHorizontal: 25, borderRadius: 14, alignItems: 'center', elevation: 4 },
+  btnLabel: { color: '#fff', fontWeight: 'bold', fontSize: 16, marginLeft: 10 },
+  btnDisabled: { backgroundColor: '#bdc3c7' },
+  instructionText: { fontSize: 11, color: '#95a5a6', marginTop: 15, fontStyle: 'italic' },
+  imageWrapper: { width: '100%', height: 350 },
+  previewImage: { width: '100%', height: '100%' },
+  loaderCenter: { position: 'absolute', alignSelf: 'center', top: '45%' },
+  emptyState: { alignItems: 'center' },
+  emptyStateText: { marginTop: 15, fontSize: 14, color: '#bdc3c7', textAlign: 'center' },
+  footerCloseBtn: { backgroundColor: '#34495e', padding: 16, borderRadius: 15, alignItems: 'center', marginTop: 20 },
+  footerCloseText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
 });
 
 export default SupplierBillModal;

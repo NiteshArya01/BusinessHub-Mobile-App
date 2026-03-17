@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState,useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
 import { savePurchaseEntry } from '../../controllers/PurchaseController'; 
 
-const SimpleVoucher = ({ party, onEntrySuccess }) => {
+const SimpleVoucher = ({ party, onEntrySuccess, editTransaction }) => {
   const [billNo, setBillNo] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState('');
@@ -14,6 +14,37 @@ const SimpleVoucher = ({ party, onEntrySuccess }) => {
   const [loading, setLoading] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
+
+
+  const clearForm = () => {
+  setBillNo('');
+  setAmount('');
+  
+  // New entry ke liye aaj ki date default rakhte hain
+  const today = new Date();
+  const day = String(today.getDate()).padStart(2, '0');
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const year = today.getFullYear();
+  setDate(`${day}/${month}/${year}`);
+  
+  setRemarks('');
+  setSelectedFile(null);
+  setErrors({});
+};
+
+useEffect(() => {
+  if (editTransaction) {
+    // 🟢 EDIT MODE: Data fill karo
+    setBillNo(editTransaction.details?.billNumber || '');
+    setAmount(editTransaction.amount ? editTransaction.amount.toString() : '');
+    setDate(editTransaction.date || '');
+    setRemarks(editTransaction.details?.remarks || '');
+    // Agar file URL hai toh use handle karein (optional)
+  } else {
+    // ⚪ NEW ENTRY MODE: Sab saaf kar do
+    clearForm();
+  }
+}, [editTransaction]);
 
 
 
@@ -96,29 +127,25 @@ const SimpleVoucher = ({ party, onEntrySuccess }) => {
     if (!validateForm()) return;
     setLoading(true);
 
+
     const voucherData = {
+      id: editTransaction?.id || null,
       partyId: party.id,
       billNo,
       date,
       amount: parseFloat(amount),
       remarks,
-      type: 'Voucher'
+      type: 'Voucher',
+      files:selectedFile
     };
-
-    // Agar file select ki hai toh use add karein
-    // if (selectedFile) {
-    //   formData.append('attachment', {
-    //     uri: selectedFile.uri,
-    //     name: selectedFile.name,
-    //     type: selectedFile.mimeType || 'application/octet-stream',
-    //   });
-    // }
 
     try {
       const result = await savePurchaseEntry(voucherData);
       if (result.success) {
         Alert.alert("Success", "Voucher recorded successfully!");
+        
         onEntrySuccess();
+        clearForm();
       } else {
         Alert.alert("Error", result.message || "Something went wrong");
       }

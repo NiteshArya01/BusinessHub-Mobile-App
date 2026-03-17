@@ -44,7 +44,7 @@ const TransactionList = ({
 
   const renderTransaction = ({ item }) => {
 
-    const isPayment = item.entryType === "payment";
+    const isPayment = item.entryType === "Payment";
     const isPurchase =
       item.entryType === "purchaseVoucher" ||
       item.entryType === "purchaseInventory";
@@ -57,9 +57,11 @@ const TransactionList = ({
           <Text style={styles.transDate}>{item.date}</Text>
 
           <Text style={styles.transRemark} numberOfLines={1}>
-            Bill No:
+            {!isPayment ? "Bill No: " : ""} 
+            
             <Text style={{ fontWeight: 'bold', color: '#333' }}>
-              {item.details?.billNumber || " N/A"}
+              {/* {item.details?.billNumber || " N/A"} */}
+              {!isPayment ? item.details?.billNumber || " N/A" : ""} 
             </Text>
 
             {item.details?.remarks && (

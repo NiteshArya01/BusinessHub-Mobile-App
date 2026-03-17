@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
-import { fetchSupplierLedgerPaginated,savePaymentEntry } from '../../controllers/PurchaseController';
+import { fetchSupplierLedgerPaginated,savePaymentEntry,deletePurchaseTransaction } from '../../controllers/PurchaseController';
 
 // Custom Components
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -10,6 +10,7 @@ import TransactionFilters from './TransactionFilters';
 import TransactionList from './TransactionList';
 import PurchaseEntryModal from './PurchaseEntryModal';
 import PaymentEntryModal from './PaymentEntryModal';
+import ConfirmModal from '../../components/ConfirmModal';
 
 const defaultFilter = {
   type: null,
@@ -43,6 +44,15 @@ export default function SupplierDetailPage({ route, navigation }) {
 
   // Filter State
   const [filters, setFilters] = useState(defaultFilter);
+
+  // Delete Transection
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [selectedTransactionId, setSelectedTransactionId] = useState(null);
+
+
+   // Edit Transection
+  const [editTransaction, setEditTransaction] = useState(null);
+
 
 
   useEffect(() => {
@@ -110,16 +120,30 @@ export default function SupplierDetailPage({ route, navigation }) {
     setIsFetchingMore(false);
   };
 
+
+  // Edit Transection
   const handleTransectionEdit = (transaction) => {
-    Alert.alert("Edit", `You want to edit transaction: ${transaction.id}`);
-    // Yahan aap edit logic implement kar sakte hain
+
+    setEditTransaction(transaction);
+    handleOpenModal(transaction.entryType);
   }
 
   const handleTransectionDelete = (transaction) => {
-    Alert.alert(
-      "Confirm Delete", 
-    )
+    setSelectedTransactionId(transaction.id);
+    setDeleteModalVisible(true);
   }
+  const handleConfirmDelete = async () => {
+      if (selectedTransactionId) {
+        const res = await deletePurchaseTransaction(selectedTransactionId);
+        if (res.success) {
+          await resetAndLoad(); // List refresh
+          setDeleteModalVisible(false);
+          setSelectedTransactionId(null); // ID clear karein
+        } else {
+          Alert.alert("Error", "Could not delete transaction.");
+        }
+      }
+    };
 
   const handleOpenModal = (type) => {
     if (type === 'Purchase') {
@@ -130,12 +154,12 @@ export default function SupplierDetailPage({ route, navigation }) {
     } else if (type === 'Payment') {
       setPaymentModalVisible(true);
     }
-  };
-
-  const handleSaveEntry = () => {
-    // Logic to save entry goes here
-    setModalVisible(false);
-    Alert.alert("Success", `${transType} added successfully`);
+    else if(type === 'Voucher'){
+      setTransType(type);
+      setAmount('');
+      setBillNo('');
+      setPurchaseModalVisible(true);
+    }
   };
 
 
@@ -302,7 +326,8 @@ const handleSavePayment = async (data) => {
       <PurchaseEntryModal 
         visible={purchaseModalVisible}
         supplier={supplier}
-        onClose={() => setPurchaseModalVisible(false)}
+        editTransaction={editTransaction}
+        onClose={() => (setPurchaseModalVisible(false),setEditTransaction(null))}
         refreshList={()=>{
           resetAndLoad();
           // loadTransactions();
@@ -313,9 +338,19 @@ const handleSavePayment = async (data) => {
        {/* Payment Entry Modal */}
       <PaymentEntryModal 
         visible={paymentModalVisible} 
-        onClose={() => setPaymentModalVisible(false)} 
+        initialData={editTransaction}
+        onClose={() => (setPaymentModalVisible(false),setEditTransaction(null))} 
         onSave={handleSavePayment} 
       />
+
+            <ConfirmModal 
+              visible={deleteModalVisible}
+              title="Delete Transaction?"
+              message="Are you sure you want to delete this transaction? This action cannot be undone."
+              confirmText="Yes, Delete"
+              onConfirm={handleConfirmDelete}
+              onCancel={() => setDeleteModalVisible(false)}
+            />
     </View>
   );
 }

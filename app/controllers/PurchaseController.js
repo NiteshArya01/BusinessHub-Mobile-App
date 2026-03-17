@@ -1,8 +1,11 @@
 // controllers/PurchaseController.js
 import { db,auth } from '../api/firebase'; // Aapki firebase file
-import { collection,query,addDoc, serverTimestamp, doc, updateDoc, increment,where,orderBy,getDocs,limit,startAfter } from 'firebase/firestore';
+import { uploadFileToCloudinary } from '../api/cloudinaryService';
+import { collection,query,addDoc,getDoc,deleteDoc, serverTimestamp, doc, updateDoc, increment,where,orderBy,getDocs,limit,startAfter } from 'firebase/firestore';
+
 
 export const savePurchaseEntry = async (voucherData) => {
+
   try {
     const user = auth.currentUser;
     if (!user) {
@@ -14,55 +17,79 @@ export const savePurchaseEntry = async (voucherData) => {
 
     let balanceEffect = 0;
     let docRef;
+    let finalFileUrl = null;
+
+    // 1. FILE UPLOAD LOGIC (NEW OR EDIT)
+    // Agar voucherData.files ke andar 'uri' hai, matlab naya file select hua hai
+    if (voucherData.files && voucherData.files.uri) {
+      const uploadResult = await uploadFileToCloudinary({
+        uri: voucherData.files.uri,
+        type: voucherData.files.mimeType,
+        name: voucherData.files.name,
+      });
+
+      if (uploadResult) {
+        finalFileUrl = uploadResult; // Cloudinary URL mil gaya
+      }
+    }
 
     // 🟢 NEW ENTRY
     if (!voucherData.id) {
-
       const newEntry = {
         userId: user.uid,
         supplierId: voucherData.partyId,
-        entryType: voucherData.type, // purchaseVoucher / purchaseInventory
+        entryType: voucherData.type,
         amount,
         date: voucherData.date,
-        createdAt: serverTimestamp(),
+        createdAt: serverTimestamp(),        
         details: {
           billNumber: voucherData.billNo || "",
-          remarks: voucherData.remarks || ""
+          remarks: voucherData.remarks || "",
+          attachment: finalFileUrl || "", // Agar file nahi hai to blank save hoga
         }
       };
 
       docRef = await addDoc(ledgerRef, newEntry);
-
-      balanceEffect = amount; // full add
+      balanceEffect = amount;
 
     } 
     // 🟡 UPDATE ENTRY
     else {
-
       const docRefPath = doc(db, "supplierLedger", voucherData.id);
 
-      // 🔥 Old amount fetch karo
+      // Old amount fetch karo balance calculate karne ke liye
       const oldSnap = await getDoc(docRefPath);
-      const oldAmount = oldSnap.data().amount;
-
-      // difference nikalo
+      if (!oldSnap.exists()) throw new Error("Document not found!");
+      
+      const oldData = oldSnap.data();
+      const oldAmount = oldData.amount;
       balanceEffect = amount - oldAmount;
 
-      await updateDoc(docRefPath, {
+      // Update Object tayyar karo
+      const updateData = {
         amount,
         date: voucherData.date,
         details: {
           billNumber: voucherData.billNo || "",
-          remarks: voucherData.remarks || ""
+          remarks: voucherData.remarks || "",
+          attachment: oldData.details?.attachment || ""
         }
-      });
+      };
 
+      // 🔥 SPECIAL LOGIC FOR FILE:
+      // Agar naya file upload hua hai (finalFileUrl null nahi hai), tabhi update karo
+      // Agar finalFileUrl null hai, matlab user ne koi nayi file select nahi ki, 
+      // isliye hum is field ko touch hi nahi karenge (purana wala safe rahega)
+      if (finalFileUrl) {
+        updateData.details.attachment = finalFileUrl;
+      }
+
+      await updateDoc(docRefPath, updateData);
       docRef = { id: voucherData.id };
     }
 
     // 🔄 Balance Update
     const partyRef = doc(db, "suppliers", voucherData.partyId);
-
     await updateDoc(partyRef, {
       totalBalance: increment(balanceEffect)
     });
@@ -70,7 +97,8 @@ export const savePurchaseEntry = async (voucherData) => {
     return {
       success: true,
       id: docRef.id,
-      message: "Purchase saved successfully!"
+      message: "Purchase saved successfully!",
+      url: finalFileUrl // Ye controller ko wapas de dete hain confirmation ke liye
     };
 
   } catch (error) {
@@ -80,7 +108,11 @@ export const savePurchaseEntry = async (voucherData) => {
 };
 
 
+
+
+
 export const savePaymentEntry = async (paymentData) => {
+  
   try {
     const user = auth.currentUser;
 
@@ -94,20 +126,35 @@ export const savePaymentEntry = async (paymentData) => {
     let balanceEffect = 0;
     let docId = null;
 
+    let finalFileUrl = null;
+
+    // 1. FILE UPLOAD LOGIC (NEW OR EDIT)
+    // Agar voucherData.files ke andar 'uri' hai, matlab naya file select hua hai
+    if (paymentData.files && paymentData.files.uri) {
+      const uploadResult = await uploadFileToCloudinary({
+        uri: paymentData.files.uri,
+        type: paymentData.files.mimeType,
+        name: paymentData.files.name,
+      });
+
+      if (uploadResult) {
+        finalFileUrl = uploadResult; // Cloudinary URL mil gaya
+      }
+    }
     // 🟢 NEW PAYMENT
     if (!paymentData.id) {
 
       const newEntry = {
         userId: user.uid,
         supplierId: paymentData.partyId,
-        entryType: "payment",
+        entryType: "Payment",
         amount: amount,
         date: paymentData.date,
         createdAt: serverTimestamp(),
         details: {
           mode: paymentData.paymentMode || "",
           remarks: paymentData.remarks || "",
-          attachment: paymentData.attachment || null,
+          attachment: finalFileUrl || null,
         }
       };
 
@@ -120,37 +167,39 @@ export const savePaymentEntry = async (paymentData) => {
     }
 
     // 🟡 UPDATE PAYMENT
-    else {
+else {
+  const docRefPath = doc(db, "supplierLedger", paymentData.id);
 
-      const docRefPath = doc(db, "supplierLedger", paymentData.id);
+  // 1. Old data fetch karo
+  const oldSnap = await getDoc(docRefPath);
+  if (!oldSnap.exists()) {
+    return { success: false, message: "Payment entry not found." };
+  }
 
-      // 🔥 Old amount fetch karo
-      const oldSnap = await getDoc(docRefPath);
+  const oldData = oldSnap.data();
+  const oldAmount = oldData.amount;
 
-      if (!oldSnap.exists()) {
-        return { success: false, message: "Payment entry not found." };
-      }
+  // 2. Balance effect calculate karo
+  const difference = amount - oldAmount;
+  balanceEffect = -difference;
 
-      const oldAmount = oldSnap.data().amount;
+  // 3. 🔥 Smart Attachment Logic
+  // Agar naya file upload hua hai (finalFileUrl), toh woh use karo.
+  // Agar nahi hua, toh jo database mein pehle se hai (oldData.details.attachment), use hi rehne do.
+  const attachmentToSave = finalFileUrl || (oldData.details?.attachment || null);
 
-      // Difference nikaalo
-      const difference = amount - oldAmount;
-
-      // Payment me difference bhi minus hoga
-      balanceEffect = -difference;
-
-      await updateDoc(docRefPath, {
-        amount: amount,
-        date: paymentData.date,
-        details: {
-          mode: paymentData.paymentMode || "",
-          remarks: paymentData.remarks || "",
-          attachment: paymentData.attachment || null,
-        }
-      });
-
-      docId = paymentData.id;
+  await updateDoc(docRefPath, {
+    amount: amount,
+    date: paymentData.date,
+    details: {
+      mode: paymentData.paymentMode || "",
+      remarks: paymentData.remarks || "",
+      attachment: attachmentToSave, // Purana wala ya naya URL
     }
+  });
+
+  docId = paymentData.id;
+}
 
     // 🔄 Supplier Balance Update
     const partyRef = doc(db, "suppliers", paymentData.partyId);
@@ -274,89 +323,51 @@ export const fetchSupplierLedgerPaginated = async ({
 };
 
 
+/**
+ * Deletes a purchase transaction and reverts the supplier's balance.
+ * @param {string} transactionId - The unique ID of the ledger entry.
+ */
+export const deletePurchaseTransaction = async (transactionId) => {
+  try {
+    // 1. Fetch the existing transaction to get amount and supplier details
+    const docRef = doc(db, "supplierLedger", transactionId);
+    const snap = await getDoc(docRef);
 
-// 2. Fetch Purchases with Filters (New)
-// export const fetchPurchases = async (filters = {}) => {
-//   try {
-//     const { supplierId } = filters;
-//     const currentUser = auth.currentUser; // Current login user ki ID
+    if (!snap.exists()) {
+      return { 
+        success: false, 
+        message: "Transaction record not found in the database." 
+      };
+    }
 
-//     if (!currentUser) {
-//       return { success: false, message: "User not logged in" };
-//     }
+    const { supplierId, amount } = snap.data();
 
-//     if (!supplierId) {
-//       return { success: false, message: "Supplier ID is missing" };
-//     }
+    /**
+     * BALANCE REVERSION LOGIC:
+     * Since a Purchase adds to the liability (+Amount), 
+     * deleting it must subtract the amount (-Amount) from the supplier's total balance.
+     */
+    const balanceAdjustment = -Math.abs(amount);
 
-//     const purchaseRef = collection(db, 'purchases');
-    
-//     // 1. Pehla filter: Sirf current user ka data (Security)
-//     // 2. Doosra filter: Sirf us specific supplier ka data
-//     const q = query(
-//       purchaseRef,
-//       where("userId", "==", currentUser.uid),     // Login user check
-//       where("supplierId", "==", supplierId),      // Particular supplier check
-//       orderBy("createdAt", "desc")                // Latest transactions first
-//     );
+    // 2. Revert Supplier's Total Balance
+    const supplierRef = doc(db, "suppliers", supplierId);
+    await updateDoc(supplierRef, {
+      totalBalance: increment(balanceAdjustment)
+    });
 
-//     const querySnapshot = await getDocs(q);
+    // 3. Remove the entry from Ledger
+    await deleteDoc(docRef);
 
-//     const results = querySnapshot.docs.map(doc => ({
-//       id: doc.id,
-//       ...doc.data()
-//     }));
+    return { 
+      success: true, 
+      message: "Transaction deleted and account balance adjusted successfully." 
+    };
 
-//     return { success: true, data: results };
-
-//   } catch (error) {
-//     console.error("Firebase Fetch Error:", error);
-//     return { success: false, message: error.message };
-//   }
-// };
-
-// make supplier payment entry in ledger and update balance
-// export const savePaymentEntry = async (paymentData) => {
-//   try {
-//     const user = auth.currentUser;
-//     if (!user) {
-//       return { success: false, message: "User not logged in." };
-//     }
-
-//     const ledgerRef = collection(db, 'supplierLedger');
-
-//     // --- 1. Structured Payment Data ---
-//     const newEntry = {
-//       userId: user.uid,
-//       supplierId: paymentData.partyId,
-//       date: paymentData.date,
-//       totalAmount: parseFloat(paymentData.amount), // Main field for easy calculation
-//       entryType: 'Payment', // Filter karne ke liye
-//       createdAt: serverTimestamp(),
-      
-//       // Payment specific details ek object ke andar
-//       paymentDetails: {
-//         mode: paymentData.paymentMode,
-//         remarks: paymentData.remarks || "",
-//         attachment: paymentData.attachment || null,
-//       }
-//     };
-
-//     // 2. Save Entry
-//     const docRef = await addDoc(ledgerRef, newEntry);
-
-//     // 3. Update Supplier Balance (Minus logic)
-//     const partyRef = doc(db, 'suppliers', paymentData.partyId);
-//     const amountToSubtract = -Math.abs(parseFloat(paymentData.amount));
-
-//     await updateDoc(partyRef, {
-//       totalBalance: increment(amountToSubtract)
-//     });
-
-//     return { success: true, id: docRef.id, message: "Payment added to ledger!" };
-
-//   } catch (error) {
-//     console.error("Payment Save Error:", error);
-//     return { success: false, message: error.message };
-//   }
-// };
+  } catch (error) {
+    console.error("Delete Transaction Error:", error);
+    return { 
+      success: false, 
+      message: "An error occurred while attempting to delete the record." 
+    };
+  }
+};

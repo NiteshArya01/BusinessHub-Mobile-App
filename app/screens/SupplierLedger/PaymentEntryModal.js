@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, Text, Modal, TextInput, TouchableOpacity, 
   StyleSheet, KeyboardAvoidingView, Platform, Dimensions,
-  ScrollView, ActivityIndicator
+  ScrollView, ActivityIndicator, Alert
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -11,76 +11,100 @@ import * as DocumentPicker from 'expo-document-picker';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const PaymentEntryModal = ({ visible, onClose, onSave }) => {
+const PaymentEntryModal = ({ visible, onClose, onSave, initialData = null }) => {
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
   const [paymentMode, setPaymentMode] = useState('');
   const [remarks, setRemarks] = useState('');
-  const [attachment, setAttachment] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // --- Error State ---
   const [errors, setErrors] = useState({});
 
-  // --- Validation Logic ---
+  // --- Handle Edit Mode: Populate data if initialData exists ---
+  useEffect(() => {
+    if (initialData && visible) {
+      setAmount(initialData.amount?.toString() || '');
+      // Date handling: Convert string back to Date object if needed
+      const [day, month, year] = initialData.date.split('/');
+      setDate(new Date(year, month - 1, day));
+      setPaymentMode(initialData.details?.mode || '');
+      setRemarks(initialData.details?.remarks || '');
+      // We don't set selectedFile here because we only track "NEW" uploads in this state
+      setSelectedFile(null); 
+    } else if (visible) {
+      resetFields();
+    }
+  }, [initialData, visible]);
+
+  const onPickFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*', 'application/pdf'],
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled) {
+        // Keeping the whole asset object to pass uri, name, and mimeType
+        setSelectedFile(result.assets[0]);
+      }
+    } catch (error) {
+      Alert.alert("System Error", "Unable to access the document picker.");
+    }
+  };
+
+  const onRemoveFile = () => setSelectedFile(null);
+
   const validateForm = () => {
     let sErrors = {};
-
-    if (!amount) {
-      sErrors.amount = "Amount is required";
-    } else if (isNaN(amount) || parseFloat(amount) <= 0) {
-      sErrors.amount = "Invalid amount";
-    }
-
-    if (!date) {
-      sErrors.date = "Select a date";
-    }
-
-    if (!paymentMode) {
-      sErrors.mode = "Select payment mode";
-    }
-
+    if (!amount || isNaN(amount) || parseFloat(amount) <= 0) sErrors.amount = "Please enter a valid amount";
+    if (!date) sErrors.date = "Transaction date is required";
+    if (!paymentMode) sErrors.mode = "Select a payment method";
     setErrors(sErrors);
     return Object.keys(sErrors).length === 0;
   };
 
-  // --- Form Submission ---
   const handleSubmit = async () => {
     if (validateForm()) {
       setIsSubmitting(true);
-      
       try {
         const paymentData = {
-          type: 'Payment Out',
+          id: initialData?.id || null, // Essential for Edit Mode
           amount: parseFloat(amount),
           date: date.toLocaleDateString('en-GB'),
           paymentMode,
           remarks: remarks.trim(),
-          attachment: attachment ? attachment.uri : null,
-          timestamp: new Date().toISOString(),
+          // Passing the OBJECT, not just the URI string
+          files: selectedFile ? {
+            uri: selectedFile.uri,
+            mimeType: selectedFile.mimeType,
+            name: selectedFile.name
+          } : null,
+          partyId: initialData?.partyId || initialData?.supplierId, // Ensure partyId is present
         };
 
-        // Simulating API call or processing delay
-        await new Promise(resolve => setTimeout(resolve, 1200));
-        
-        onSave(paymentData);
+        await onSave(paymentData);
         resetAndClose();
       } catch (error) {
         console.error("Submission Error:", error);
+        Alert.alert("Submission Failed", "An error occurred while saving the transaction.");
       } finally {
         setIsSubmitting(false);
       }
     }
   };
 
-  const resetAndClose = () => {
+  const resetFields = () => {
     setAmount('');
     setRemarks('');
     setPaymentMode('');
     setDate(new Date());
-    setAttachment(null);
+    setSelectedFile(null);
     setErrors({});
+  };
+
+  const resetAndClose = () => {
+    resetFields();
     onClose();
   };
 
@@ -89,14 +113,14 @@ const PaymentEntryModal = ({ visible, onClose, onSave }) => {
       <View style={styles.modalOverlay}>
         <TouchableOpacity style={styles.clickableOverlay} activeOpacity={1} onPress={onClose} />
         
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardView}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboardView}>
           <View style={styles.sheetContent}>
             <View style={styles.handleBar} />
             
             <View style={styles.sheetHeader}>
               <View>
-                <Text style={styles.sheetTitle}>Give Payment</Text>
-                <Text style={styles.subTitle}>Add payment details for Fashion Point</Text>
+                <Text style={styles.sheetTitle}>{initialData ? "Update Payment" : "Payment Entry"}</Text>
+                <Text style={styles.subTitle}>Enter transaction details below</Text>
               </View>
               <TouchableOpacity onPress={onClose} disabled={isSubmitting}>
                 <Ionicons name="close-circle" size={32} color="#D1D5DB" />
@@ -106,24 +130,20 @@ const PaymentEntryModal = ({ visible, onClose, onSave }) => {
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent}>
               
               <View style={styles.row}>
-                {/* Date Section */}
                 <View style={styles.inputFlex}>
-                  <Text style={styles.label}>Date *</Text>
+                  <Text style={styles.label}>Transaction Date *</Text>
                   <TouchableOpacity 
                     style={[styles.defaultInput, errors.date && styles.inputError]} 
                     onPress={() => setShowPicker(true)}
                   >
-                    <Text style={styles.inputText}>{date ? date.toLocaleDateString('en-GB') : 'Select Date'}</Text>
+                    <Text style={styles.inputText}>{date.toLocaleDateString('en-GB')}</Text>
                     <Ionicons name="calendar-outline" size={20} color={errors.date ? "#ff4d4d" : "#0077cc"} />
                   </TouchableOpacity>
-                  <View style={styles.errorContainer}>
-                    {errors.date && <Text style={styles.errorText}>{errors.date}</Text>}
-                  </View>
+                  <View style={styles.errorContainer}>{errors.date && <Text style={styles.errorText}>{errors.date}</Text>}</View>
                 </View>
 
-                {/* Amount Section */}
                 <View style={styles.inputFlex}>
-                  <Text style={styles.label}>Enter Amount *</Text>
+                  <Text style={styles.label}>Amount (INR) *</Text>
                   <View style={[styles.defaultInput, errors.amount && styles.inputError]}>
                     <Text style={styles.currencyPrefix}>₹</Text>
                     <TextInput 
@@ -137,9 +157,7 @@ const PaymentEntryModal = ({ visible, onClose, onSave }) => {
                       }}
                     />
                   </View>
-                  <View style={styles.errorContainer}>
-                    {errors.amount && <Text style={styles.errorText}>{errors.amount}</Text>}
-                  </View>
+                  <View style={styles.errorContainer}>{errors.amount && <Text style={styles.errorText}>{errors.amount}</Text>}</View>
                 </View>
               </View>
 
@@ -148,17 +166,12 @@ const PaymentEntryModal = ({ visible, onClose, onSave }) => {
                   value={date} 
                   mode="date" 
                   display="default" 
-                  onChange={(e, d) => {
-                    setShowPicker(false); 
-                    if(d) setDate(d); 
-                    setErrors(prev => ({...prev, date: null}));
-                  }} 
+                  onChange={(e, d) => { setShowPicker(false); if(d) setDate(d); }} 
                 />
               )}
 
-              {/* Payment Mode */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Payment Mode *</Text>
+                <Text style={styles.label}>Payment Method *</Text>
                 <View style={[styles.pickerBox, errors.mode && styles.inputError]}>
                   <MaterialCommunityIcons name="wallet-outline" size={20} color={errors.mode ? "#ff4d4d" : "#0077cc"} style={{ marginLeft: 12 }} />
                   <View style={{ flex: 1 }}>
@@ -169,65 +182,60 @@ const PaymentEntryModal = ({ visible, onClose, onSave }) => {
                         if(errors.mode) setErrors(prev => ({...prev, mode: null}));
                       }}
                     >
-                      <Picker.Item label="Select Mode" value="" color="#9CA3AF" />
-                      <Picker.Item label="Cash" value="Cash" />
-                      <Picker.Item label="UPI / Online" value="UPI" />
+                      <Picker.Item label="Select Method" value="" color="#9CA3AF" />
+                      <Picker.Item label="Cash Payment" value="Cash" />
+                      <Picker.Item label="UPI / Digital" value="UPI" />
                       <Picker.Item label="Bank Transfer" value="Bank" />
                       <Picker.Item label="Cheque" value="Cheque" />
                     </Picker>
                   </View>
                 </View>
-                <View style={styles.errorContainer}>
-                  {errors.mode && <Text style={styles.errorText}>{errors.mode}</Text>}
-                </View>
+                <View style={styles.errorContainer}>{errors.mode && <Text style={styles.errorText}>{errors.mode}</Text>}</View>
               </View>
 
-              {/* Remarks */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Remarks</Text>
+                <Text style={styles.label}>Additional Remarks</Text>
                 <TextInput 
                   style={[styles.defaultInput, styles.textArea]} 
-                  placeholder="Any notes..." 
+                  placeholder="Optional notes regarding this payment..." 
                   multiline
                   value={remarks}
                   onChangeText={setRemarks}
                 />
               </View>
 
-              {/* Attachment Section - Centered and Fixed */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Attachment</Text>
-                <TouchableOpacity style={styles.uploadBox} onPress={async () => {
-                   let result = await DocumentPicker.getDocumentAsync({ type: ['image/*', 'application/pdf'] });
-                   if (!result.canceled) setAttachment(result.assets[0]);
-                }}>
-                  {attachment ? (
-                    <View style={styles.centeredRow}>
-                      <Ionicons name="document-text" size={20} color="#0077cc" />
-                      <Text style={styles.attachmentName} numberOfLines={1}>{attachment.name}</Text>
-                      <TouchableOpacity onPress={() => setAttachment(null)}>
-                        <Ionicons name="close-circle" size={20} color="#ff4d4d" style={{ marginLeft: 8 }} />
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <View style={styles.centeredRow}>
-                      <Ionicons name="cloud-upload-outline" size={22} color="#9CA3AF" />
-                      <Text style={styles.uploadText}>Upload Bill (PDF/Image)</Text>
-                    </View>
-                  )}
+              <Text style={styles.label}>Supporting Document (Receipt/Screenshot)</Text>
+              {!selectedFile ? (
+                <TouchableOpacity style={styles.uploadBtn} onPress={onPickFile}>
+                  <Ionicons name="cloud-upload-outline" size={24} color="#666" />
+                  <Text style={styles.uploadBtnText}>Choose Image or PDF</Text>
                 </TouchableOpacity>
-              </View>
+              ) : (
+                <View style={styles.fileCard}>
+                  <MaterialCommunityIcons 
+                    name={selectedFile.name.toLowerCase().endsWith('.pdf') ? "file-pdf-box" : "image-area"} 
+                    size={28} 
+                    color="#0077cc" 
+                  />
+                  <Text style={styles.fileName} numberOfLines={1}>{selectedFile.name}</Text>
+                  <TouchableOpacity onPress={onRemoveFile}>
+                    <Ionicons name="trash-bin-outline" size={22} color="#e74c3c" />
+                  </TouchableOpacity>
+                </View>
+              )}
 
-              {/* Save Button */}
               <TouchableOpacity 
                 style={[styles.saveBtn, isSubmitting && { opacity: 0.8 }]} 
                 onPress={handleSubmit}
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
-                  <ActivityIndicator color="#fff" />
+                  <View style={styles.loaderRow}>
+                    <ActivityIndicator color="#fff" style={{ marginRight: 10 }} />
+                    <Text style={styles.saveBtnText}></Text>
+                  </View>
                 ) : (
-                  <Text style={styles.saveBtnText}>Save Payment</Text>
+                  <Text style={styles.saveBtnText}>{initialData ? "Update Record" : "Save Payment"}</Text>
                 )}
               </TouchableOpacity>
             </ScrollView>
@@ -239,52 +247,34 @@ const PaymentEntryModal = ({ visible, onClose, onSave }) => {
 };
 
 const styles = StyleSheet.create({
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   clickableOverlay: { ...StyleSheet.absoluteFillObject },
   keyboardView: { width: '100%' },
   sheetContent: { backgroundColor: '#fff', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: 20, paddingBottom: 30, maxHeight: SCREEN_HEIGHT * 0.9 },
   handleBar: { width: 45, height: 5, backgroundColor: '#E5E7EB', borderRadius: 10, alignSelf: 'center', marginTop: 12, marginBottom: 15 },
   sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
-  sheetTitle: { fontSize: 20, fontWeight: 'bold', color: '#0077cc' },
-  subTitle: { fontSize: 13, color: '#6B7280' },
-  label: { fontSize: 13, color: '#4B5563', marginBottom: 4, fontWeight: '600' },
+  sheetTitle: { fontSize: 22, fontWeight: 'bold', color: '#0077cc' },
+  subTitle: { fontSize: 13, color: '#95a5a6', marginTop: 2 },
+  label: { fontSize: 13, color: '#34495e', marginBottom: 6, fontWeight: '700', marginTop: 10 },
   row: { flexDirection: 'row', justifyContent: 'space-between' },
   inputFlex: { flex: 1, marginRight: 8 },
-  defaultInput: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 8, paddingHorizontal: 12, height: 50, backgroundColor: '#fff' },
-  inputError: { borderColor: '#ff4d4d' },
-  
-  // Shake Fix: Reserve space for errors
-  errorContainer: { height: 18, justifyContent: 'center' },
-  errorText: { color: '#ff4d4d', fontSize: 11, fontWeight: '500' },
-  
+  defaultInput: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#eee', borderRadius: 12, paddingHorizontal: 12, height: 55, backgroundColor: '#f9f9f9' },
+  inputError: { borderColor: '#ff4d4d', backgroundColor: '#fff5f5' },
+  errorContainer: { height: 20, justifyContent: 'center' },
+  errorText: { color: '#ff4d4d', fontSize: 11, fontWeight: '600' },
   textInputStyle: { flex: 1, fontSize: 16, color: '#000' },
   inputText: { flex: 1, fontSize: 16, color: '#000' },
-  currencyPrefix: { fontSize: 16, color: '#6B7280', marginRight: 5 },
-  inputGroup: { marginBottom: 5 },
-  pickerBox: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 8, backgroundColor: '#fff', height: 50 },
-  textArea: { height: 70, textAlignVertical: 'top', paddingTop: 10 },
-  
-  // Attachment Styling
-  uploadBox: { 
-    borderStyle: 'dashed', 
-    borderWidth: 1, 
-    borderColor: '#D1D5DB', 
-    borderRadius: 10, 
-    height: 60, 
-    backgroundColor: '#F9FAFB', 
-    justifyContent: 'center', 
-    alignItems: 'center' 
-  },
-  centeredRow: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center' 
-  },
-  uploadText: { color: '#9CA3AF', marginLeft: 10, fontSize: 14 },
-  attachmentName: { color: '#0077cc', marginLeft: 8, fontSize: 14, fontWeight: '500', maxWidth: '70%' },
-  
-  saveBtn: { backgroundColor: '#0077cc', padding: 16, borderRadius: 10, alignItems: 'center', marginTop: 15, height: 55, justifyContent: 'center' },
-  saveBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 18 }
+  currencyPrefix: { fontSize: 16, color: '#7f8c8d', fontWeight: 'bold', marginRight: 5 },
+  inputGroup: { marginBottom: 2 },
+  pickerBox: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#eee', borderRadius: 12, backgroundColor: '#f9f9f9', height: 55 },
+  textArea: { height: 80, textAlignVertical: 'top', paddingTop: 12 },
+  uploadBtn: { borderStyle: 'dashed', borderWidth: 1.5, borderColor: '#cbd5e0', borderRadius: 12, height: 65, backgroundColor: '#f8fafc', justifyContent: 'center', alignItems: 'center', flexDirection: 'row' },
+  uploadBtnText: { color: '#718096', marginLeft: 10, fontSize: 14, fontWeight: '500' },
+  fileCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ebf8ff', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#bee3f8' },
+  fileName: { flex: 1, marginLeft: 10, fontSize: 14, color: '#2b6cb0', fontWeight: '600' },
+  saveBtn: { backgroundColor: '#0077cc', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 20, height: 60, justifyContent: 'center', elevation: 2 },
+  saveBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 18 },
+  loaderRow: { flexDirection: 'row', alignItems: 'center' }
 });
 
 export default PaymentEntryModal;
